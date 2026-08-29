@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/LaurentMaxhuni/OpenLearn/discussions
+    about: Ask questions or explore an idea before opening a tracked issue.
+  - name: Security vulnerability
+    url: https://github.com/LaurentMaxhuni/OpenLearn/security/advisories/new
+    about: Report security vulnerabilities privately.
