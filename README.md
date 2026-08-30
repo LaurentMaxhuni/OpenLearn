@@ -6,7 +6,7 @@
 
 ## What is OpenLearn?
 
-OpenLearn will provide reusable template code and components for a learning dashboard. An AI agent connected through the Model Context Protocol (MCP) will generate a learning plan, OpenLearn will validate and structure the plan, and dashboard components will visualize goals, topics, progress, and next steps.
+OpenLearn will provide reusable components and a dashboard for plan-shaped content supplied by an external AI client. The AI client interprets the learner's request and calls OpenLearn through the Model Context Protocol (MCP); OpenLearn validates the input, manages the resulting state, and renders goals, topics, progress, and next steps through its dashboard components.
 
 ## Planned capabilities
 
@@ -18,7 +18,7 @@ OpenLearn will provide reusable template code and components for a learning dash
 
 ## Current status
 
-The repository is being prepared before implementation. The next design phase will choose the web stack, component strategy, learning-plan contract, MCP connection boundary, dashboard information architecture, and test/CI strategy.
+The repository is being prepared before implementation. The product and architecture boundaries are recorded; the next design phase will define the visual system, dashboard information architecture, component states, responsive behavior, and accessibility contract.
 
 ## Contributing
 

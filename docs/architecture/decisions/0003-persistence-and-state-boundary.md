@@ -1,0 +1,73 @@
+# ADR-0003: Persistence and state boundary
+
+**Status:** Accepted
+
+## Context
+
+The returning-user journey requires plan state and learner progress to survive refreshes, sessions, and service restarts. MCP connections and external requests also have lifecycle state, but that state is temporary, sensitive, and not part of the learner's plan. Treating both categories alike would either lose learner progress or retain more integration data than the product needs.
+
+## Decision
+
+Use PostgreSQL 18 as OpenLearn's durable store. Access it only through persistence adapters that implement ports owned by the application layer. Domain and application packages may depend on repository interfaces and transaction abstractions, but they must not depend on a PostgreSQL client, SQL row shape, or migration tool.
+
+Durable domain state includes:
+
+- the internal learner or workspace ownership reference;
+- accepted plan identity and versioned plan revisions;
+- plan content that passed the domain validation boundary;
+- learner progress and the state transitions that the product permits; and
+- the minimum audit metadata needed to explain ownership, revision, and progress changes.
+
+Bounded integration state includes:
+
+- MCP session metadata when a transport requires it;
+- request correlation and lifecycle status;
+- idempotency or deduplication records with an explicit expiry policy;
+- retry, timeout, and cancellation metadata; and
+- short-lived authorization or capability-discovery caches.
+
+Bounded integration records may be stored in PostgreSQL when cross-instance consistency requires it, but they are not learner-domain state and must have retention limits. Process memory must never be the only copy of data needed after a restart or by another service instance.
+
+The system does not persist raw AI conversations, bearer tokens, authorization codes, or full request payloads in observability records by default. Plan content is stored only after validation and subject to the retention and deletion rules selected by the product and privacy review.
+
+Domain writes use transactions. Plan revisions and learner progress use explicit version or optimistic-concurrency checks, and external mutations require an idempotency key or equivalent request identity so retries cannot silently overwrite confirmed state. Schema migrations are versioned, reviewable, and run separately from application startup when the deployment environment requires it.
+
+The exact tables, fields, indexes, and plan serialization are Phase 4 work. This decision establishes ownership and storage semantics, not the canonical domain schema.
+
+## Alternatives considered
+
+### Document database
+
+A document store could accept evolving AI-shaped payloads quickly, but it would make progress transitions, ownership, revisions, and concurrency rules harder to review as separate invariants. PostgreSQL keeps the durable core explicit while still allowing versioned content to carry structured data where the Phase 4 contract requires it.
+
+### Browser-only storage
+
+Browser storage would reduce service complexity but cannot support reliable returning-user access across devices or a trusted MCP write boundary. It also makes learner ownership and data deletion less controllable.
+
+### Provider-managed application database
+
+A managed application platform could remove database operations, but it would couple domain state to the platform's identity, query, and deployment model before OpenLearn has validated those choices.
+
+## Consequences
+
+Positive consequences:
+
+- Learner progress and accepted revisions have a durable source of truth.
+- Application services can test domain transitions without a live MCP client.
+- Retry and concurrency behavior can be made explicit and observable.
+- Integration metadata can be retained narrowly and expired independently of learner data.
+
+Costs and constraints:
+
+- The first implementation needs migrations, transaction handling, and local PostgreSQL setup.
+- The domain model must define version, deletion, and progress semantics before schema work is complete.
+- Horizontal service scaling requires externalized bounded integration state for any stateful transport behavior.
+
+## Revisit conditions
+
+Revisit this decision if the domain becomes genuinely event-sourced, if measured workloads require a separate analytical store, or if the Phase 4 contract shows that a different durable representation can preserve ownership, revision, progress, and deletion invariants more clearly.
+
+## References
+
+- [PostgreSQL supported versions and versioning policy](https://www.postgresql.org/support/versioning/)
+- [PostgreSQL current documentation](https://www.postgresql.org/docs/current/)
