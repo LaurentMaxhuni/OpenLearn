@@ -141,7 +141,7 @@ The UI uses separate axes. A component may show one state from each axis at the 
 
 The UI may use shorter labels in a badge, but accessible text must retain the meaning. “Completed” without a subject is prohibited for content status because it can be confused with learner progress.
 
-The Phase 2 operation states map to presentation states as follows: `received` and `in_progress` map to `pending`; `reconciling` maps to `recovering`; `succeeded` maps to `accepted` when an accepted revision exists; `rejected` maps to `invalid` when validation or authorization prevented a write; `failed_retryable` maps to `retryable`; `cancelled` maps to `cancelled`; `expired` maps to `expired`; and `conflict` maps to `conflict`. The application layer owns this mapping, not `packages/ui`.
+The Phase 2 operation states map to presentation states as follows: `received` and `in_progress` map to `pending`; `reconciling` maps to `recovering`; `succeeded` maps to `accepted` when an accepted revision exists; `rejected` maps to `invalid` only when validation, shape, or content safety prevented a write, while authorization, ownership, issuer, audience, or scope rejection maps to `unavailable`; `failed_retryable` maps to `retryable`; `cancelled` maps to `cancelled`; `expired` maps to `expired`; and `conflict` maps to `conflict`. An authorization or ownership rejection must not attach a plan reference, accepted content, progress, resource-status detail, or recovery guidance that would reveal whether the requested resource exists. An independently authorized dashboard read may render its own result, but it must not infer resource status from the rejected operation. The application layer owns this mapping, not `packages/ui`.
 
 ### 3.2 Learner-confirmed progress state
 
@@ -171,7 +171,7 @@ Components use semantic roles rather than hard-coded color names. The initial pa
 | `color.text` | `#172033` | Primary text and headings. |
 | `color.text-muted` | `#4E5B71` | Supporting text; never the only source of meaning. |
 | `color.border` | `#C7CFDD` | Default boundaries and dividers. |
-| `color.border-strong` | `#8B97AA` | Boundaries needing additional separation. |
+| `color.border-strong` | `#667085` | Essential control boundaries and other boundaries needing additional separation. |
 | `color.action` | `#1F52C9` | Links, primary controls, and progress emphasis. |
 | `color.action-strong` | `#163F9F` | Hover, active, or high-emphasis action state. |
 | `color.success` | `#166534` | Confirmed learner progress and successful recovery. |
@@ -262,7 +262,7 @@ The implementation must meet WCAG 2.2 AA expectations for the following dashboar
 - Async changes use a suitable live region: non-blocking progress/result messages use a status region, while blocking validation or authorization errors use an alert region with concise actionable text.
 - The progress summary has a text equivalent such as “4 of 12 items completed by you”; a progress bar is supplementary.
 - Text remains readable at increased browser zoom and user text spacing. Content is not clipped, overlapped, or hidden behind fixed controls.
-- Error text identifies what the learner can do next and does not expose raw payloads, bearer tokens, full plan content, or internal stack details.
+- Error text identifies what the learner can do next and does not expose raw payloads, bearer tokens, full plan content, or internal stack details. Authorization or ownership failures use the generic unavailable state and do not identify whether a resource exists or suggest correcting a submission.
 - The final rendered token pairs are verified for the contrast ratios in Section 4.1.
 
 ### 6.4 Motion and input modes
