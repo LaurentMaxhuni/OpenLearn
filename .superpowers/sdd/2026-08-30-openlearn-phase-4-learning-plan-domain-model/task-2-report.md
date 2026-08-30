@@ -261,3 +261,167 @@ ok 7 - declares identifier allocation kinds for deterministic fixture allocators
 
 - The environment is running Node `v22.22.1` while the workspace declares `>=24.0.0 <25.0.0`. All required checks passed under Node 22, but the engine warning remains and should be resolved by running the workspace on the declared Node 24 line.
 - `pnpm run test` still sees a generated `dist/test/empty.test.js` artifact left from the previous placeholder test flow. It does not affect Task 2 correctness, but it is still counted as an extra passing subtest until a later cleanup removes stale generated output handling.
+
+## Fix round 1
+
+### Review findings addressed
+
+- Updated `packages/domain/src/types.ts` so `LearnerProgressRecord` is a discriminated union keyed by `state`.
+  - `not_started` and `in_progress` now reject `lastNonCompleteState`.
+  - `completed_by_learner` alone may carry `lastNonCompleteState`.
+  - No other progress semantics changed.
+- Replaced the tautological identifier-kind test in `packages/domain/test/primitives.test.ts` with a real assertion over exported `IDENTIFIER_KINDS` and a deterministic `IdentityAllocator` implementation.
+
+### Changed files
+
+- `packages/domain/src/types.ts`
+- `packages/domain/test/primitives.test.ts`
+- `C:/github-projects/OpenLearn/.superpowers/sdd/2026-08-30-openlearn-phase-4-learning-plan-domain-model/task-2-report.md`
+
+### TDD evidence
+
+#### RED
+
+Focused command:
+
+```powershell
+pnpm --filter @openlearn/domain exec tsc -p tsconfig.json
+if ($LASTEXITCODE -eq 0) {
+  node --test dist/test/primitives.test.js
+  exit $LASTEXITCODE
+}
+exit $LASTEXITCODE
+```
+
+Focused RED output after writing the new tests first:
+
+```text
+../..                                    |  WARN  Unsupported engine: wanted: {"node":">=24.0.0 <25.0.0"} (current: {"node":"v22.22.1","pnpm":"10.15.0"})
+test/primitives.test.ts(318,3): error TS2578: Unused '@ts-expect-error' directive.
+test/primitives.test.ts(329,3): error TS2578: Unused '@ts-expect-error' directive.
+undefined
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 2: tsc -p tsconfig.json
+```
+
+This was the expected failure: the new test proved the existing `LearnerProgressRecord` still accepted invalid `lastNonCompleteState` combinations.
+
+#### GREEN
+
+Focused command:
+
+```powershell
+pnpm --filter @openlearn/domain exec tsc -p tsconfig.json
+if ($LASTEXITCODE -eq 0) {
+  node --test dist/test/primitives.test.js
+  exit $LASTEXITCODE
+}
+exit $LASTEXITCODE
+```
+
+Focused GREEN output:
+
+```text
+../..                                    |  WARN  Unsupported engine: wanted: {"node":">=24.0.0 <25.0.0"} (current: {"node":"v22.22.1","pnpm":"10.15.0"})
+TAP version 13
+# Subtest: brands valid opaque identifiers without changing case
+ok 1 - brands valid opaque identifiers without changing case
+# Subtest: rejects empty, whitespace-padded, control-containing, and overlong identifiers
+ok 2 - rejects empty, whitespace-padded, control-containing, and overlong identifiers
+# Subtest: accepts readable slug-like identifiers as opaque exact case-sensitive values
+ok 3 - accepts readable slug-like identifiers as opaque exact case-sensitive values
+# Subtest: defines required fields and preserves declared readonly collection order
+ok 4 - defines required fields and preserves declared readonly collection order
+# Subtest: models learner progress so only completed items can carry an undo state
+ok 5 - models learner progress so only completed items can carry an undo state
+# Subtest: defines every error category with safe machine-readable detail fields
+ok 6 - defines every error category with safe machine-readable detail fields
+# Subtest: exports identifier allocation kinds and supports deterministic allocators
+ok 7 - exports identifier allocation kinds and supports deterministic allocators
+1..7
+# tests 7
+# pass 7
+# fail 0
+```
+
+### Tests and commands
+
+Focused test names exercised:
+
+- `models learner progress so only completed items can carry an undo state`
+- `exports identifier allocation kinds and supports deterministic allocators`
+
+Commands run:
+
+```powershell
+pnpm --filter @openlearn/domain exec tsc -p tsconfig.json
+if ($LASTEXITCODE -eq 0) {
+  node --test dist/test/primitives.test.js
+  exit $LASTEXITCODE
+}
+exit $LASTEXITCODE
+```
+
+```powershell
+pnpm run typecheck
+```
+
+```powershell
+pnpm run test
+```
+
+`pnpm run typecheck` output:
+
+```text
+ WARN  Unsupported engine: wanted: {"node":">=24.0.0 <25.0.0"} (current: {"node":"v22.22.1","pnpm":"10.15.0"})
+
+> openlearn@ typecheck C:\github-projects\OpenLearn
+> pnpm --recursive run typecheck
+
+.                                        |  WARN  Unsupported engine: wanted: {"node":">=24.0.0 <25.0.0"} (current: {"node":"v22.22.1","pnpm":"10.15.0"})
+
+> @openlearn/domain@0.0.0 typecheck C:\github-projects\OpenLearn\packages\domain
+> tsc --noEmit
+```
+
+`pnpm run test` output:
+
+```text
+ WARN  Unsupported engine: wanted: {"node":">=24.0.0 <25.0.0"} (current: {"node":"v22.22.1","pnpm":"10.15.0"})
+
+> openlearn@ test C:\github-projects\OpenLearn
+> pnpm --recursive run test
+
+.                                        |  WARN  Unsupported engine: wanted: {"node":">=24.0.0 <25.0.0"} (current: {"node":"v22.22.1","pnpm":"10.15.0"})
+
+> @openlearn/domain@0.0.0 test C:\github-projects\OpenLearn\packages\domain
+> tsc -p tsconfig.json && node --test dist/test/*.test.js
+
+TAP version 13
+# Subtest: dist\\test\\empty.test.js
+ok 1 - dist\\test\\empty.test.js
+# Subtest: brands valid opaque identifiers without changing case
+ok 2 - brands valid opaque identifiers without changing case
+# Subtest: rejects empty, whitespace-padded, control-containing, and overlong identifiers
+ok 3 - rejects empty, whitespace-padded, control-containing, and overlong identifiers
+# Subtest: accepts readable slug-like identifiers as opaque exact case-sensitive values
+ok 4 - accepts readable slug-like identifiers as opaque exact case-sensitive values
+# Subtest: defines required fields and preserves declared readonly collection order
+ok 5 - defines required fields and preserves declared readonly collection order
+# Subtest: models learner progress so only completed items can carry an undo state
+ok 6 - models learner progress so only completed items can carry an undo state
+# Subtest: defines every error category with safe machine-readable detail fields
+ok 7 - defines every error category with safe machine-readable detail fields
+# Subtest: exports identifier allocation kinds and supports deterministic allocators
+ok 8 - exports identifier allocation kinds and supports deterministic allocators
+1..8
+# tests 8
+# pass 8
+# fail 0
+```
+
+### Self-review
+
+- Confirmed the progress change is limited to the type model and preserves the approved state names and ownership fields.
+- Confirmed `Context.entries`, `PlanItem.resources`, and the 0..max / 1..max bounds were not changed.
+- Confirmed the replacement allocator test now exercises the exported `IDENTIFIER_KINDS` value and the `IdentityAllocator` contract with deterministic runtime output.
+- Confirmed no new provider, UI, persistence, network, or reviewer-only behavior was introduced.

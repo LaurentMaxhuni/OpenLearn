@@ -89,15 +89,34 @@ export type NonCompleteProgressState = Extract<
   'not_started' | 'in_progress'
 >;
 
-export interface LearnerProgressRecord {
+interface LearnerProgressRecordBase {
   readonly ownerId: InternalOwnerId;
   readonly planId: PlanId;
   readonly itemId: PlanItemId;
-  readonly state: ProgressState;
   readonly progressVersion: NonNegativeInteger;
-  readonly lastNonCompleteState?: NonCompleteProgressState;
   readonly lastConfirmedAt: Timestamp;
 }
+
+export interface NotStartedProgressRecord extends LearnerProgressRecordBase {
+  readonly state: 'not_started';
+  readonly lastNonCompleteState?: never;
+}
+
+export interface InProgressProgressRecord extends LearnerProgressRecordBase {
+  readonly state: 'in_progress';
+  readonly lastNonCompleteState?: never;
+}
+
+export interface CompletedByLearnerProgressRecord
+  extends LearnerProgressRecordBase {
+  readonly state: 'completed_by_learner';
+  readonly lastNonCompleteState?: NonCompleteProgressState;
+}
+
+export type LearnerProgressRecord =
+  | NotStartedProgressRecord
+  | InProgressProgressRecord
+  | CompletedByLearnerProgressRecord;
 
 export interface AcceptedRevisionRef {
   readonly revisionId: RevisionId;

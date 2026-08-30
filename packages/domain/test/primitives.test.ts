@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   DOMAIN_ERROR_CATEGORIES,
   DOMAIN_LIMITS,
+  IDENTIFIER_KINDS,
   type AcceptedRevisionRef,
   type CanonicalPlanContent,
   type Context,
@@ -14,6 +15,7 @@ import {
   type DomainResult,
   type Goal,
   type IdentifierKind,
+  type IdentityAllocator,
   type InternalOwnerId,
   type LearnerProgressRecord,
   type Milestone,
@@ -274,6 +276,71 @@ test('defines required fields and preserves declared readonly collection order',
   );
 });
 
+test('models learner progress so only completed items can carry an undo state', () => {
+  const owner = expectSuccess(
+    brandIdentifier('internal_owner', 'owner-internal-fixture'),
+  );
+  const plan = expectSuccess(brandIdentifier('plan', 'fixture-plan-basics'));
+  const item = expectSuccess(brandIdentifier('plan_item', 'fixture-item-reading'));
+
+  const notStarted: LearnerProgressRecord = {
+    ownerId: owner,
+    planId: plan,
+    itemId: item,
+    state: 'not_started',
+    progressVersion: 0,
+    lastConfirmedAt: asTimestamp(TEST_TIMESTAMP),
+  };
+
+  const inProgress: LearnerProgressRecord = {
+    ownerId: owner,
+    planId: plan,
+    itemId: item,
+    state: 'in_progress',
+    progressVersion: 1,
+    lastConfirmedAt: asTimestamp(TEST_TIMESTAMP),
+  };
+
+  const completed: LearnerProgressRecord = {
+    ownerId: owner,
+    planId: plan,
+    itemId: item,
+    state: 'completed_by_learner',
+    progressVersion: 2,
+    lastNonCompleteState: 'in_progress',
+    lastConfirmedAt: asTimestamp(TEST_TIMESTAMP),
+  };
+
+  assert.equal('lastNonCompleteState' in notStarted, false);
+  assert.equal('lastNonCompleteState' in inProgress, false);
+  assert.equal(completed.lastNonCompleteState, 'in_progress');
+
+  const invalidNotStarted: LearnerProgressRecord = {
+    ownerId: owner,
+    planId: plan,
+    itemId: item,
+    state: 'not_started',
+    progressVersion: 0,
+    // @ts-expect-error lastNonCompleteState must be absent for not_started
+    lastNonCompleteState: 'not_started',
+    lastConfirmedAt: asTimestamp(TEST_TIMESTAMP),
+  };
+
+  const invalidInProgress: LearnerProgressRecord = {
+    ownerId: owner,
+    planId: plan,
+    itemId: item,
+    state: 'in_progress',
+    progressVersion: 1,
+    // @ts-expect-error lastNonCompleteState must be absent for in_progress
+    lastNonCompleteState: 'in_progress',
+    lastConfirmedAt: asTimestamp(TEST_TIMESTAMP),
+  };
+
+  void invalidNotStarted;
+  void invalidInProgress;
+});
+
 test('defines every error category with safe machine-readable detail fields', () => {
   const categoriesByExpectedCode: ReadonlyArray<
     readonly [DomainErrorCategory, DomainErrorDetail['code']]
@@ -328,8 +395,8 @@ test('defines every error category with safe machine-readable detail fields', ()
   }
 });
 
-test('declares identifier allocation kinds for deterministic fixture allocators', () => {
-  const expectedKinds: IdentifierKind[] = [
+test('exports identifier allocation kinds and supports deterministic allocators', () => {
+  const expectedKinds: readonly IdentifierKind[] = [
     'plan',
     'revision',
     'goal',
@@ -341,9 +408,34 @@ test('declares identifier allocation kinds for deterministic fixture allocators'
     'internal_owner',
   ];
 
-  const seenKinds = new Set<IdentifierKind>(expectedKinds);
+  class DeterministicAllocator implements IdentityAllocator {
+    readonly calls: IdentifierKind[] = [];
+    readonly counters = new Map<IdentifierKind, number>();
 
-  assert.equal(seenKinds.size, expectedKinds.length);
+    allocate(kind: IdentifierKind): string {
+      this.calls.push(kind);
+      const nextCount = (this.counters.get(kind) ?? 0) + 1;
+      this.counters.set(kind, nextCount);
+      return `fixture-${kind}-${nextCount.toString().padStart(3, '0')}`;
+    }
+  }
+
+  const allocator = new DeterministicAllocator();
+  const allocatedValues = IDENTIFIER_KINDS.map((kind) => allocator.allocate(kind));
+
+  assert.deepEqual(IDENTIFIER_KINDS, expectedKinds);
+  assert.deepEqual(allocator.calls, expectedKinds);
+  assert.deepEqual(allocatedValues, [
+    'fixture-plan-001',
+    'fixture-revision-001',
+    'fixture-goal-001',
+    'fixture-context_entry-001',
+    'fixture-milestone-001',
+    'fixture-topic-001',
+    'fixture-plan_item-001',
+    'fixture-resource-001',
+    'fixture-internal_owner-001',
+  ]);
 });
 
 void ((_: PlanId, __: InternalOwnerId) => undefined);
