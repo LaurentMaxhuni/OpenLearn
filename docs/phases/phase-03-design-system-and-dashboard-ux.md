@@ -2,11 +2,15 @@
 
 ## Status
 
-Next
+Complete
 
 ## Objective
 
 Define the responsive, accessible dashboard experience and the visual language that will make learning goals, topics, milestones, and progress understandable.
+
+## Completed specification
+
+The reviewed Phase 3 UX and design-system contract is [OpenLearn Phase 3: Dashboard UX and design-system specification](../superpowers/specs/2026-08-30-openlearn-phase-3-dashboard-ux-design.md). It is the source of detail for the information architecture, routes, responsive composition, tokens, accessibility criteria, component inventory, state matrix, view-model boundary, fixture guidance, and phase handoffs below.
 
 ## Why this phase matters
 
@@ -14,14 +18,17 @@ The dashboard will be the learner's primary view of a generated plan. Clear hier
 
 ## Deliverables
 
-- Dashboard information architecture tied to the agreed learner journeys.
-- Responsive layout behavior across supported viewport sizes.
-- Design tokens for color, typography, spacing, shape, elevation, and motion where needed.
-- Component inventory with default, focus, disabled, empty, loading, error, and success states.
-- Accessible names, keyboard behavior, focus order, contrast expectations, and reduced-motion behavior.
-- Visual patterns for goals, topics, milestones, plan items, and progress.
-- Empty, loading, partial, invalid, and recoverable-error states.
-- A clear distinction between learner-confirmed state and untrusted or pending AI-generated content.
+- [x] Dashboard information architecture tied to the agreed learner journeys.
+- [x] Responsive layout behavior across compact, medium, and wide viewport bands.
+- [x] Design tokens for color, typography, spacing, shape, elevation, and motion.
+- [x] Component inventory with default, focus, disabled, empty, loading, error, and success states.
+- [x] Accessible names, keyboard behavior, focus order, contrast expectations, text reflow, and reduced-motion behavior.
+- [x] Visual patterns for goals, topics, milestones, plan items, and progress.
+- [x] Empty, loading, partial, invalid, interrupted, recovering, and recoverable-error states.
+- [x] A clear distinction between learner-confirmed state and untrusted or pending externally supplied content.
+- [x] Deterministic fixture guidance and a framework-neutral `packages/ui` view-model boundary.
+- [x] An authorized dashboard `Delete plan` action with a non-modal accessible confirmation disclosure, defined focus behavior, pending/recovery/failure, conflict/fresh-read, committed-deletion, and non-disclosing unavailable states.
+- [x] A required `Undo completion` action for completed learner items, including pending and failure behavior that preserves confirmed state.
 
 ## Workstreams
 
@@ -44,13 +51,18 @@ The dashboard will be the learner's primary view of a generated plan. Clear hier
 - **Risk:** Loading or error states hide whether a plan is trustworthy. **Decision:** Distinguish pending, validated, learner-confirmed, and failed states in the UX.
 - **Risk:** Untrusted AI output is presented as authoritative. **Decision:** Make validation and learner confirmation visible in the experience.
 
+## Review outcome
+
+The specification satisfies the Phase 3 exit criteria and creates the documented UX prerequisite for Phase 4. It explicitly covers the required learner data-control action and reversible completion action. Phase 4 may now define the canonical domain contract against the explicit view-model and state requirements; this phase does not define the domain schema or implementation framework.
+
 ## Exit criteria
 
-- A reviewed UX specification describes the dashboard information architecture and primary journeys.
-- A token and component-state inventory covers the core dashboard surfaces.
-- Responsive behavior is defined for supported viewport sizes and interaction modes.
-- Accessibility acceptance criteria cover names, focus, keyboard behavior, contrast, text, and motion.
-- Empty, loading, partial, invalid, and error states are specified before Phase 4 begins.
+- [x] A reviewed UX specification describes the dashboard information architecture and primary journeys.
+- [x] A token and component-state inventory covers the core dashboard surfaces.
+- [x] Responsive behavior is defined for supported viewport sizes and interaction modes.
+- [x] Accessibility acceptance criteria cover names, focus, keyboard behavior, contrast, text, and motion.
+- [x] Empty, loading, partial, invalid, and error states are specified before Phase 4 begins.
+- [x] Required learner data-control and reversible-progress actions are specified with accessible confirmation, application intents, preserved confirmed state, and recovery behavior.
 
 ## Next phase
 

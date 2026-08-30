@@ -18,7 +18,7 @@ OpenLearn will provide reusable components and a dashboard for plan-shaped conte
 
 ## Current status
 
-The repository is being prepared before implementation. The product and architecture boundaries are recorded; the next design phase will define the visual system, dashboard information architecture, component states, responsive behavior, and accessibility contract.
+The repository is being prepared before implementation. The product and architecture boundaries and the Phase 3 dashboard UX contract are recorded; the next design phase will define the canonical learning-plan domain model.
 
 ## Contributing
 
