@@ -1,6 +1,6 @@
 # OpenLearn product brief
 
-**Status:** Reviewed for the Phase 2 handoff
+**Status:** Reviewed; Phase 2 architecture resolutions recorded
 
 **Availability:** Planned. This brief defines the intended product boundary; it does not claim that the dashboard, component library, persistence, or MCP integration is implemented.
 
@@ -55,9 +55,10 @@ The first-run journey starts outside OpenLearn, in the learner's existing AI con
 1. The learner tells the connected AI client what they want to learn and supplies any context they choose to share.
 2. The AI client decides to use OpenLearn and calls one or more of its capabilities with the information needed to construct or update a plan view. Those calls may carry plan-shaped content; OpenLearn does not infer the learner's intent or choose the curriculum.
 3. OpenLearn treats the input as external and untrusted. It validates the payload and either accepts a renderable plan state or returns an actionable validation result to the calling client.
-4. The dashboard presents the accepted plan with its goal, outline, current state, progress summary, and most useful next action.
-5. The learner reviews the view, opens the first useful item, and records progress when they complete an item. The first experience makes the connection between the AI-generated content and the learner's own confirmed state visible.
-6. If the input is incomplete, invalid, or interrupted, OpenLearn keeps the failure recoverable. The learner sees the recoverable state and what needs attention; the calling client can retry or revise the request without leaving a broken dashboard behind.
+4. When a plan view is accepted, OpenLearn returns a stable plan reference and authenticated dashboard URL to the calling client. The AI client presents that link or reference in the conversation so the learner can open the dashboard; OpenLearn does not own that conversation or send the learner a message.
+5. The learner follows the link, completes dashboard authentication if needed, and sees the accepted plan with its goal, outline, current state, progress summary, and most useful next action.
+6. The learner reviews the view, opens the first useful item, and records progress when they complete an item. The first experience makes the connection between the AI-generated content and the learner's own confirmed state visible.
+7. If the input is incomplete, invalid, or interrupted, OpenLearn keeps the failure recoverable. The learner sees the recoverable state and what needs attention; the calling client can retry or revise the request without leaving a broken dashboard behind. The last accepted plan remains available when one exists.
 
 The first-run journey is successful when a learner can move from an accepted external request to a usable dashboard view and identify a next action without needing to understand OpenLearn's implementation.
 
@@ -151,29 +152,29 @@ OpenLearn's first product cycle does not include:
 - External plan content is untrusted and can be malformed, incomplete, duplicated, stale, or unavailable.
 - The product needs stable identifiers and explicit lifecycle/progress semantics so the dashboard and learner actions refer to the same plan state.
 - The first learner experience is individual and subject-neutral. It focuses on one current plan or a small set of plans rather than organizations, cohorts, or shared classrooms.
-- The learner can access the dashboard independently of the AI conversation through a link, saved view, or other mechanism that Phase 2 will select.
-- The product must retain enough accepted plan state and learner progress to support the returning-user journey, while identity, retention, and deletion rules remain architecture and privacy decisions.
+- The learner can access the dashboard independently of the AI conversation through an authenticated plan URL returned by an accepted MCP operation, or through the authenticated plan list.
+- The product retains accepted plan state and learner progress while the account and plan exist, with explicit deletion, bounded integration retention, and backup-purge assumptions recorded in the Phase 2 architecture.
 - Maintainers need deterministic fixtures and a provider-neutral component boundary before a live AI client is required for development.
 - OpenLearn may expose or receive capabilities through MCP, but its exact connection topology and authorization model are not decided in this phase.
 
 ## Open product questions
 
-These questions are intentionally open. Phase 2 should resolve the architecture questions first and carry the remaining contract and UX questions to their owning phases.
+These questions tracked discovery. Phase 2 resolves the architecture questions below; remaining contract and UX questions continue to their owning phases.
 
 ### Priority 0: boundary and architecture
 
-1. Is the minimum product a standalone dashboard, an embeddable component surface, or both?
-2. What is the smallest external capability set for the first end-to-end flow: plan creation, plan retrieval, progress updates, revision, or another split?
-3. How does the calling AI client obtain or return a reference to the learner's dashboard view?
-4. What identity and authorization context can OpenLearn rely on when an AI client calls it, and how is that context connected to the learner's dashboard session?
-5. What persistence and revision model supports one learner returning to a plan without allowing duplicate or stale requests to overwrite confirmed progress?
+1. Is the minimum product a standalone dashboard, an embeddable component surface, or both? **Resolved by Phase 2:** The standalone dashboard is the first host; an embeddable component surface is deferred until an external consumer justifies it.
+2. What is the smallest external capability set for the first end-to-end flow: plan creation, plan retrieval, progress updates, revision, or another split? **Resolved by Phase 2:** The first capability groups are plan-view creation or revision, authorized plan-view retrieval, and learner-authorized progress actions; exact tool names and schemas belong to Phase 6.
+3. How does the calling AI client obtain or return a reference to the learner's dashboard view? **Resolved by Phase 2:** An accepted plan-view mutation returns an opaque plan reference and authenticated `/plans/{plan_id}` URL; the AI client presents it, and `/plans` is the returning-user fallback.
+4. What identity and authorization context can OpenLearn rely on when an AI client calls it, and how is that context connected to the learner's dashboard session? **Resolved by Phase 2:** The first hosted release requires dashboard OIDC and remote MCP OAuth to use one canonical issuer; both map the same `(issuer, subject)` to one internal owner, with no implicit cross-provider linking.
+5. What persistence and revision model supports one learner returning to a plan without allowing duplicate or stale requests to overwrite confirmed progress? **Resolved by Phase 2:** Accepted state is durable, mutations are transactional and idempotent, stale revisions conflict, failed work preserves the last accepted state, and deletion blocks stale resurrection.
 
 ### Priority 1: contract and experience
 
 6. Which plan content types are required for the first dashboard, and which can remain opaque plan-supplied content?
 7. Which fields may a learner change directly, and which changes must come from a new or revised AI-client submission?
-8. How should the calling AI client receive validation errors, pending status, and partial-result information without exposing unnecessary learner data?
-9. What privacy, retention, deletion, and observability rules apply to plan content, learner progress, and external request metadata?
+8. How should the calling AI client receive validation errors, pending status, and partial-result information without exposing unnecessary learner data? **Phase 2 baseline:** Results carry a bounded operation status, stable identifiers, dashboard handoff when a view exists, and redacted actionable errors; exact MCP envelopes belong to Phase 6.
+9. What privacy, retention, deletion, and observability rules apply to plan content, learner progress, and external request metadata? **Phase 2 baseline:** Accepted plans persist while owned; deletion revokes access immediately and purges primary data within 24 hours; bounded integration data expires after 24 hours; redacted telemetry is retained 30 days, minimal security/ownership audit metadata 90 days, and backups expire or are scrubbed within 35 days. Phase 9 verifies the final implementation.
 10. Which responsive, accessibility, and interaction constraints must the first dashboard support across devices and input modes?
 
 ### Priority 2: later product surface
@@ -183,13 +184,13 @@ These questions are intentionally open. Phase 2 should resolve the architecture 
 
 ## Phase 2 handoff
 
-Phase 2 should turn this product boundary into explicit technical decisions in the following order:
+Phase 2 turned this product boundary into explicit technical decisions in the following order:
 
 1. **Boundary map:** Separate the external AI client from OpenLearn's capability boundary, validation/domain state, persistence, dashboard, and learner-action surfaces.
-2. **First delivery shape:** Decide whether the minimum product is standalone, embeddable, or both, and define how a learner reaches the current dashboard view after an external call.
-3. **Identity and persistence:** Define the minimum identity, authorization, plan ownership, revision, retention, and recovery assumptions needed for the returning-user journey.
-4. **MCP capability lifecycle:** Define discovery, invocation, request state, authorization, timeout, cancellation, duplicate handling, and privacy-aware observability without selecting behavior for the AI client's conversation.
+2. **First delivery shape:** Select the standalone dashboard as the first host, return an authenticated plan URL/reference after accepted plan-view mutations, and use the authenticated plan list as the returning-user fallback.
+3. **Identity and persistence:** Require one canonical identity authority for hosted dashboard and remote MCP ownership, map both to an internal owner, and define plan ownership, revision, retention, deletion, and recovery assumptions.
+4. **MCP capability lifecycle:** Define discovery, invocation, request state, authorization, timeout, cancellation, duplicate handling, retries, and privacy-aware observability without selecting behavior for the AI client's conversation.
 5. **Implementation-neutral contracts:** Specify the interfaces that Phase 3's components and Phase 4's canonical plan model must satisfy, while leaving framework and SDK selection to the architecture record.
 6. **Verification boundary:** Define local fixtures, contract checks, and failure-state expectations that let maintainers validate the dashboard without depending on one provider or an undocumented external account.
 
-Phase 2 is complete when those decisions preserve the core promise: an external AI client can provide plan-shaped content, OpenLearn can safely turn it into durable state, and reusable components can present a learner-facing dashboard without taking ownership of curriculum generation or the AI conversation.
+The [Phase 2 architecture baseline](ARCHITECTURE.md) records these resolutions and preserves the core promise: an external AI client can provide plan-shaped content, OpenLearn can safely turn it into durable state, and reusable components can present a learner-facing dashboard without taking ownership of curriculum generation or the AI conversation.

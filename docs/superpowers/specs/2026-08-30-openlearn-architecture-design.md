@@ -34,6 +34,7 @@ The remote MCP endpoint is stateless by default. Every tool call is authenticate
 | Deployment | Separate dashboard and service OCI units plus managed PostgreSQL | Independent scaling and clear trust boundaries without a cloud-provider lock-in |
 | Dashboard identity | OIDC-compatible browser session | Domain identity uses issuer and subject, not email or AI-provider identity |
 | Remote MCP auth | OAuth 2.1-compatible resource authorization | Tool calls are scoped to a resource and acting identity |
+| Hosted principal association | One configured identity authority and canonical issuer for dashboard and remote MCP | Both entry points resolve to one internal owner without implicit cross-provider matching |
 | MCP transports | stdio locally; Streamable HTTP remotely | Local client compatibility and a current remote transport with one service endpoint |
 
 ## Boundary map
@@ -91,10 +92,51 @@ The UI package may depend on shared domain-facing view-model types, but the doma
 2. The adapter checks transport-level requirements, request size, correlation metadata, and capability permissions.
 3. The application service validates the command against the versioned domain contract and applies the permitted state transition.
 4. A persistence transaction writes accepted domain state and its revision or progress change. Duplicate requests use an idempotency key or equivalent version check.
-5. The service returns a structured result containing the outcome, stable identifiers, current state, and safe learner-facing or client-facing error information.
+5. The service returns a structured result containing the outcome, stable identifiers, current state, a dashboard handoff when a plan view exists, and safe learner-facing or client-facing error information.
 6. The dashboard converts query results into view models and renders the appropriate component state. The MCP adapter converts the same application result into protocol-shaped output.
 
 MCP requests must never cause arbitrary component code, HTML, JavaScript, or database queries to execute. Plan content is data. The component registry and state mapping remain OpenLearn-owned code.
+
+## Ownership association and dashboard handoff
+
+The authentication layer maps a verified external principal `(issuer, subject)` to an internal `owner_id`. Domain records use that internal owner. For the first hosted release, the dashboard OIDC session and remote MCP authorization flow must use one configured identity authority and canonical issuer. The same learner's subject must therefore resolve to the same `owner_id`; audience and client identifiers may differ.
+
+An MCP token from another issuer is rejected for owner-bound operations. OpenLearn does not match by email, display name, AI-provider account, or equal subject values from different issuers. A future multi-authority design would require an authenticated dashboard-initiated link, authorization and explicit learner confirmation for the second principal, and a unique, auditable, revocable `(issuer, subject)` to `owner_id` mapping. No implicit cross-provider linking is part of the first hosted release.
+
+When a plan-view creation or revision is accepted, the result includes a conceptual dashboard handoff: an opaque stable `plan_id`, a `dashboard_url` formed from a configured public dashboard origin and `/plans/{plan_id}`, and the current plan or operation status. The service controls the origin and never puts a token or plan content in the URL. Exact MCP field names remain Phase 6 contract work.
+
+The calling AI client presents that link or reference in its conversation. OpenLearn does not send the learner a message or assume that the client can open a browser. The link sends the learner through dashboard authentication if needed and back to the plan route. The dashboard authorizes the route against the signed-in `owner_id`; an unrelated owner receives a non-disclosing result. The authenticated `/plans` route lists the learner's plans as the returning-user fallback.
+
+## Retention and learner-control assumptions
+
+The first implementation uses these minimum retention assumptions. They are not claims that the documentation-only repository enforces them; Phase 9 verifies the implementation against the privacy review and applicable obligations:
+
+- Accepted plan revisions and learner progress remain available while the account and plan exist. There is no inactivity expiry in the minimum product.
+- Plan deletion immediately hides the plan and rejects dashboard and MCP reads or mutations. Primary plan content, revisions, and progress are purged within 24 hours. A minimal deletion tombstone may remain only to prevent stale retries or backup restores from resurrecting the plan.
+- Account deletion applies the same revocation and purge path to every owned plan. Backups expire or are scrubbed within 35 days, and restore procedures replay deletion tombstones before serving data.
+- Pending, rejected, and expired request payloads are not retained as learner content. Lifecycle and idempotency records expire 24 hours after terminal completion or expiration. Discovery and authorization caches live no longer than 24 hours and contain no bearer tokens.
+- Redacted operational telemetry is retained for 30 days; minimal security and ownership audit metadata is retained for 90 days. Neither contains raw prompts, access tokens, authorization codes, or complete plan content by default.
+
+Learner-control invariants are transport-independent: all reads and mutations use the resolved internal owner; invalid, pending, cancelled, failed, or stale work cannot replace the last accepted state; old operations and idempotency keys cannot resurrect deleted plans; and a new plan after deletion requires a new authorized operation. Dashboard deletion is a learner action in the first release, and production has no anonymous share links.
+
+## MCP lifecycle contract
+
+After protocol initialization, standard capability discovery exposes only operations allowed for the authenticated actor and advertised contract version, without learner data. The first capability groups are plan-view creation or revision, authorized plan-view retrieval, and learner-authorized progress actions.
+
+Every mutation has an opaque operation ID and a required idempotency key. The bounded state machine is:
+
+```text
+received -> in_progress -> succeeded
+                      \-> rejected
+                      \-> failed_retryable
+                      \-> cancelled
+                      \-> expired
+                      \-> conflict
+```
+
+`rejected` covers validation or authorization without a domain write. `failed_retryable` means no commit occurred and the same idempotency key may be retried. `expired` means the bounded deadline elapsed before commit. `cancelled` means cancellation was accepted before commit. `conflict` means stale state or a changed request fingerprint for an existing key. Only `in_progress` is non-terminal.
+
+The first synchronous implementation uses a bounded request deadline with a 30-second target. Cancellation is honored before commit; after commit it cannot roll back state and returns the committed outcome. Reads may be retried. Mutations retry only with the same owner, capability, idempotency key, and request fingerprint; matching keys replay or return the existing operation, changed fingerprints conflict, and mutations without a key are rejected. A transport disconnect is only a best-effort cancellation signal. Terminal idempotency records expire 24 hours after completion or expiration. Failure, cancellation, expiration, and conflict preserve the last accepted plan.
 
 ## Environment model
 
@@ -109,14 +151,14 @@ No environment may depend on a developer's undocumented global database, provide
 ## Deliberately deferred decisions
 
 - Phase 3 defines design tokens, responsive behavior, accessibility acceptance criteria, and the complete component-state inventory.
-- Phase 4 defines the canonical plan schema, stable identifiers, lifecycle transitions, progress semantics, and version envelope.
-- Phase 6 defines exact MCP tool names, payloads, capability discovery details, request cancellation, retries, and provider-facing compatibility behavior.
+- Phase 4 defines the canonical plan schema, exact identifier fields, lifecycle fields, progress semantics, and version envelope within the ownership, retention, handoff, and mutation rules above.
+- Phase 6 defines exact MCP tool names, payloads, result envelopes, protocol cancellation wiring, and provider-facing compatibility behavior within the lifecycle contract above. It may tune bounded values such as the request deadline only through a documented contract change.
 - The identity-provider vendor, deployment vendor, database host, and package registry are not selected by this baseline.
 - Public distribution and semantic-versioning rules for the UI package are deferred until a consumer outside the dashboard exists.
 
 ## Phase 3 handoff
 
-Phase 3 can design the dashboard against a stable ownership boundary: React components render explicit view models supplied by the dashboard application, while pending, partial, invalid, failed, and learner-confirmed states remain visible. It should not introduce MCP request objects, authentication claims, or database records into component props.
+Phase 3 can design the dashboard against a stable ownership boundary: React components render explicit view models supplied by the dashboard application, while pending, partial, invalid, failed, cancelled, interrupted, retryable, and learner-confirmed states remain visible. It should include the authenticated `/plans` landing route and `/plans/{plan_id}` handoff route without introducing MCP request objects, authentication claims, or database records into component props.
 
 ## References
 

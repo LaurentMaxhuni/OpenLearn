@@ -28,7 +28,17 @@ Bounded integration state includes:
 
 Bounded integration records may be stored in PostgreSQL when cross-instance consistency requires it, but they are not learner-domain state and must have retention limits. Process memory must never be the only copy of data needed after a restart or by another service instance.
 
-The system does not persist raw AI conversations, bearer tokens, authorization codes, or full request payloads in observability records by default. Plan content is stored only after validation and subject to the retention and deletion rules selected by the product and privacy review.
+The system does not persist raw AI conversations, bearer tokens, authorization codes, or full request payloads in observability records by default. Plan content is stored only after validation in its canonical form. The first implementation uses these retention assumptions:
+
+- Accepted plan revisions and learner progress remain available while the account and plan exist; the minimum product has no inactivity expiry.
+- A learner-initiated plan deletion immediately hides the plan and rejects further reads or mutations. Primary plan content, revisions, and progress are purged within 24 hours. A minimal deletion tombstone may remain only to prevent stale retries or backup restores from resurrecting the plan.
+- Account deletion applies the same access revocation and purge behavior to every owned plan. Backups expire or are scrubbed within 35 days, and restore procedures replay deletion tombstones before serving data.
+- Pending, rejected, and expired request payloads are not retained as learner content. Lifecycle and idempotency records expire 24 hours after terminal completion or expiration; discovery and authorization caches have a maximum 24-hour lifetime and contain no bearer tokens.
+- Redacted operational telemetry is retained for 30 days. Minimal security and ownership audit metadata is retained for 90 days. Neither contains raw prompts, access tokens, authorization codes, or complete plan content by default.
+
+These are product and architecture assumptions, not a claim that the current documentation-only repository enforces them. Phase 9 verifies the final implementation against the privacy review and applicable obligations without weakening the learner-control invariants.
+
+Learners can delete a plan from the dashboard. Deletion is immediately effective for reads and writes across dashboard and MCP paths; an old operation, idempotency key, or restored backup cannot recreate it. Creating a new plan after deletion requires a new authorized operation. There are no anonymous production share links.
 
 Domain writes use transactions. Plan revisions and learner progress use explicit version or optimistic-concurrency checks, and external mutations require an idempotency key or equivalent request identity so retries cannot silently overwrite confirmed state. Schema migrations are versioned, reviewable, and run separately from application startup when the deployment environment requires it.
 
@@ -60,7 +70,7 @@ Positive consequences:
 Costs and constraints:
 
 - The first implementation needs migrations, transaction handling, and local PostgreSQL setup.
-- The domain model must define version, deletion, and progress semantics before schema work is complete.
+- The domain model must define version, deletion, retention, and progress semantics before schema work is complete.
 - Horizontal service scaling requires externalized bounded integration state for any stateful transport behavior.
 
 ## Revisit conditions

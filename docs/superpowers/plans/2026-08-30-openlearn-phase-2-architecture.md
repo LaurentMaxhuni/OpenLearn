@@ -17,6 +17,8 @@
 - OpenLearn owns validation, domain state, reusable components, dashboard rendering, and permitted learner actions.
 - External input is untrusted; MCP adapters must call application ports and must not access persistence directly.
 - Durable domain state is separated from transient transport and integration state; raw prompts, access tokens, and arbitrary generated markup are not persisted by default.
+- The first hosted release uses one canonical identity authority for dashboard and remote MCP ownership; it does not implicitly link principals from different issuers.
+- Accepted plan mutations return an authenticated dashboard handoff; MCP lifecycle outcomes, retention periods, deletion behavior, and learner-control invariants are architecture constraints before implementation.
 - The exact canonical plan schema belongs to Phase 4, and exact public MCP tool names and payloads belong to the contract work in Phases 4 and 6.
 - The repository is worked on through the existing checkout and the `phase-2-architecture` branch; no linked Git worktree is created.
 - The current repository has no runtime or test suite; implementation commands documented here are expectations for the scaffolded project, not claims about current availability.
@@ -43,7 +45,7 @@ Show the learner browser, dashboard, HTTP service, MCP adapter, application laye
 
 - [x] **Step 3: Define the implementation handoff**
 
-Document the logical workspace layout, local development contract, verification commands expected after scaffolding, environment boundaries, and the decisions deliberately deferred to Phases 3, 4, and 6.
+Document the logical workspace layout, local development contract, verification commands expected after scaffolding, environment boundaries, the dashboard handoff and returning-user route, and the decisions deliberately deferred to Phases 3, 4, and 6.
 
 ### Task 2: Record stack and component decisions
 
@@ -81,7 +83,7 @@ Compare the selected split TypeScript stack and first-party UI package with a co
 
 - [x] **Step 1: Separate durable and transient state**
 
-Choose PostgreSQL as the durable store for plan revisions, learner progress, ownership references, and other accepted domain state. Keep MCP sessions, request lifecycle state, retry metadata, deduplication keys, and token-exchange caches transient or bounded; never use process memory as the only source for state needed across instances.
+Choose PostgreSQL as the durable store for plan revisions, learner progress, ownership references, and other accepted domain state. Keep MCP sessions, request lifecycle state, retry metadata, deduplication keys, and token-exchange caches transient or bounded; define their expiry, plan deletion, account deletion, backup, and telemetry retention assumptions before schema work; never use process memory as the only source for state needed across instances.
 
 - [x] **Step 2: Select the deployment and environment model**
 
@@ -89,11 +91,11 @@ Define local, preview, and production environments with isolated configuration a
 
 - [x] **Step 3: Define identity and authorization**
 
-Use an OIDC-compatible identity boundary for dashboard sessions and OAuth 2.1-compatible authorization for remote MCP requests. Bind ownership to issuer-plus-subject, use plan-scoped permissions, avoid using email or AI-provider identifiers as domain identity, and use environment credentials plus loopback binding for local stdio integrations.
+Use an OIDC-compatible identity boundary for dashboard sessions and OAuth 2.1-compatible authorization for remote MCP requests. Require one canonical issuer for the first hosted flow, map the verified issuer-plus-subject to one internal owner, use plan-scoped permissions, avoid using email or AI-provider identifiers as domain identity, and use environment credentials plus loopback binding for local stdio integrations.
 
 - [x] **Step 4: Define the MCP boundary**
 
-Use the official MCP TypeScript SDK, stdio for client-launched local integrations, and Streamable HTTP for remote integrations. Keep the remote endpoint stateless by default, validate Origin and bearer-token audience, route tool calls through application services, return structured results, reject arbitrary code or markup, and preserve request IDs and redacted lifecycle telemetry.
+Use the official MCP TypeScript SDK, stdio for client-launched local integrations, and Streamable HTTP for remote integrations. Keep the remote endpoint stateless by default, validate Origin and bearer-token audience, route tool calls through application services, return structured results with an opaque operation ID and dashboard handoff, define discovery/state/timeout/cancellation/retry/idempotency behavior, reject arbitrary code or markup, and preserve request IDs and redacted lifecycle telemetry.
 
 - [x] **Step 5: Record alternatives and revisit conditions**
 
@@ -134,7 +136,7 @@ Update both the roadmap table and Phase 2 status, deliverables, risks, exit crit
 
 - [x] **Step 1: Check the Phase 2 deliverables**
 
-Use `rg` and a small PowerShell assertion to verify the selected stack/package approach, component strategy, durable/transient boundary, deployment/environment model, identity assumptions, MCP model, ADR links, boundary map, and local verification contract are all present.
+Use `rg` and a small PowerShell assertion to verify the selected stack/package approach, component strategy, durable/transient boundary, deployment/environment model, one-owner identity association, dashboard handoff, retention assumptions, MCP lifecycle model, ADR links, boundary map, and local verification contract are all present.
 
 - [x] **Step 2: Resolve public and architecture links**
 

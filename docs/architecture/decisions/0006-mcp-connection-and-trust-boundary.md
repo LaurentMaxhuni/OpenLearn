@@ -21,7 +21,7 @@ Keep the MCP adapter as a thin translation layer. Its capability groups are:
 - retrieval of an authorized plan view and its current state; and
 - learner-authorized progress actions that the domain contract permits.
 
-The exact tool names, schemas, result envelopes, and compatibility versions belong to Phases 4 and 6. The adapter must call application services rather than repositories or SQL. The application service performs actor checks, request-size limits, input validation, state transitions, transaction handling, idempotency, and structured error mapping.
+The exact tool names, schemas, result envelopes, and compatibility versions belong to Phases 4 and 6. The adapter must call application services rather than repositories or SQL. The application service performs actor checks, request-size limits, input validation, state transitions, transaction handling, idempotency, and structured error mapping. The lifecycle and recovery invariants below are fixed architecture behavior; later phases may specify field names and protocol wiring but may not remove them.
 
 The request lifecycle is:
 
@@ -29,12 +29,34 @@ The request lifecycle is:
 2. authenticate the caller when the transport is remote or otherwise requires credentials;
 3. validate origin, capability permission, request size, correlation metadata, and basic shape;
 4. call the application command or query with an internal actor context;
-5. commit only accepted domain state and return stable identifiers, current status, and safe errors; and
+5. commit only accepted domain state and return stable identifiers, current status, a dashboard handoff when a plan view exists, and safe errors; and
 6. emit redacted lifecycle telemetry with request and outcome identifiers.
+
+Every mutation has an opaque operation ID and a required idempotency key. Its bounded state machine is:
+
+```text
+received -> in_progress -> succeeded
+                      \-> rejected
+                      \-> failed_retryable
+                      \-> cancelled
+                      \-> expired
+                      \-> conflict
+```
+
+`rejected` means validation or authorization prevented a domain write. `failed_retryable` means the operation did not commit and may be retried with the same idempotency key. `expired` means the bounded deadline elapsed before commit. `cancelled` means cancellation was accepted before commit. `conflict` means the request was stale or reused an idempotency key with a different request fingerprint. These are terminal outcomes; `in_progress` is the only non-terminal operation state.
 
 All external content is data, not instructions to the service. The adapter and domain boundary reject arbitrary code, component names outside the allowlisted product surface, HTML or JavaScript intended for execution, unbounded content, and attempts to select a different actor. Dashboard components render validated state from the component registry; they never execute model-supplied markup.
 
-The service uses explicit cancellation, timeout, duplicate-request, and retry behavior. A failed request cannot erase the last accepted plan. A revision cannot silently overwrite learner-confirmed progress; it must pass the version and state rules defined by the domain contract. Observability records capability, actor class, correlation ID, latency, validation outcome, and failure category while omitting access tokens, authorization codes, raw prompts, and full plan content by default.
+The service uses the following lifecycle behavior:
+
+- **Discovery:** after MCP initialization, standard capability discovery exposes only operations allowed for the authenticated actor and the advertised contract version. Discovery returns no learner data. Exact tool names and metadata fields are Phase 6 work.
+- **Timeout:** the first synchronous implementation uses a bounded request deadline with a 30-second target. If the deadline occurs before commit, the transaction rolls back and the operation becomes `expired` or `failed_retryable`. If the response is lost after commit, the same idempotency key returns the committed result rather than creating a second mutation.
+- **Cancellation:** explicit cancellation is honored while the operation is `in_progress` and before the domain transaction commits. After commit, cancellation cannot roll back learner state and returns the committed outcome. A transport disconnect is only a best-effort cancellation signal.
+- **Retries:** reads may be retried. Mutations may be retried only with the same owner, capability, idempotency key, and request fingerprint. A matching key returns the existing in-progress or terminal result; a changed fingerprint is `conflict`; a mutation without an idempotency key is rejected.
+- **Duplicate handling:** OpenLearn does not guess that two different keys contain the same intent. The idempotency key is the duplicate boundary, and its record expires 24 hours after terminal completion or expiration.
+- **State preservation:** `rejected`, `failed_retryable`, `cancelled`, `expired`, and `conflict` never replace the last accepted plan. A stale revision requires a fresh read rather than an automatic overwrite.
+
+A failed request cannot erase the last accepted plan. A revision cannot silently overwrite learner-confirmed progress; it must pass the version and state rules defined by the domain contract. Observability records capability, actor class, correlation ID, operation ID, lifecycle transition, latency, validation outcome, and failure category while omitting access tokens, authorization codes, raw prompts, and full plan content by default.
 
 ## Alternatives considered
 
