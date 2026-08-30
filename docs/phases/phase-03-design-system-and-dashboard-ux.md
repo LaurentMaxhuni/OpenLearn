@@ -27,6 +27,8 @@ The dashboard will be the learner's primary view of a generated plan. Clear hier
 - [x] Empty, loading, partial, invalid, interrupted, recovering, and recoverable-error states.
 - [x] A clear distinction between learner-confirmed state and untrusted or pending externally supplied content.
 - [x] Deterministic fixture guidance and a framework-neutral `packages/ui` view-model boundary.
+- [x] An authorized dashboard `Delete plan` action with accessible confirmation, pending/recovery/failure, committed-deletion, and non-disclosing unavailable states.
+- [x] A required `Undo completion` action for completed learner items, including pending and failure behavior that preserves confirmed state.
 
 ## Workstreams
 
@@ -51,7 +53,7 @@ The dashboard will be the learner's primary view of a generated plan. Clear hier
 
 ## Review outcome
 
-The specification satisfies the Phase 3 exit criteria and creates the documented UX prerequisite for Phase 4. Phase 4 may now define the canonical domain contract against the explicit view-model and state requirements; this phase does not define the domain schema or implementation framework.
+The specification satisfies the Phase 3 exit criteria and creates the documented UX prerequisite for Phase 4. It explicitly covers the required learner data-control action and reversible completion action. Phase 4 may now define the canonical domain contract against the explicit view-model and state requirements; this phase does not define the domain schema or implementation framework.
 
 ## Exit criteria
 
@@ -60,6 +62,7 @@ The specification satisfies the Phase 3 exit criteria and creates the documented
 - [x] Responsive behavior is defined for supported viewport sizes and interaction modes.
 - [x] Accessibility acceptance criteria cover names, focus, keyboard behavior, contrast, text, and motion.
 - [x] Empty, loading, partial, invalid, and error states are specified before Phase 4 begins.
+- [x] Required learner data-control and reversible-progress actions are specified with accessible confirmation, application intents, and recovery behavior.
 
 ## Next phase
 

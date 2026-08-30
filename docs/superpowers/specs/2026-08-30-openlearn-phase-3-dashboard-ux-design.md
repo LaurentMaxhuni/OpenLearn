@@ -83,6 +83,8 @@ On wide screens, the outline and focused item may occupy adjacent columns so the
 
 The goal and context section may be concise when context is absent. It must not invent learner preferences, prior knowledge, time commitments, or outcomes that were not supplied in the accepted plan.
 
+The plan detail view also contains an explicitly labeled data-controls area for an authorized learner. It includes the required `Delete plan` action and is visually separated from learning-progress controls. The control is supplied only when the application has authorized the learner to delete that plan; it is not an external-content action and is never derived from a caller-provided actor ID.
+
 ### 2.4 Primary journeys
 
 #### First view after an accepted handoff
@@ -109,9 +111,33 @@ The existing accepted plan remains the main content. A non-blocking but prominen
 
 The page shows a pending, recovering, invalid, failed, cancelled, or empty state with an explanation of what can happen next. It does not render a partial candidate as an accepted plan. If a stable operation or dashboard reference exists, that reference may be shown through an application-provided view model; raw request content is not shown.
 
+#### Delete a plan
+
+An authorized learner can delete a plan from its dashboard detail view:
+
+1. The learner activates `Delete plan` in the data-controls area.
+2. The dashboard presents an accessible in-page confirmation dialog or disclosure that names the plan and states that deletion is irreversible, immediately hides the plan after acceptance, rejects later reads and writes, and purges primary content, revisions, and progress within 24 hours. It does not require a browser-only confirmation that assistive technology or keyboard users cannot inspect.
+3. On confirmation, the UI emits a `delete_plan` application intent containing only the opaque `planId` supplied by the application. The application performs ownership, authorization, idempotency, concurrency, and deletion handling.
+4. While deletion is being submitted or reconciled, the control is disabled, a text status is announced, and no new progress or content mutation is offered. The last accepted plan may remain visible until the service reports the durable deletion result; the UI must not claim deletion optimistically when the outcome is uncertain.
+5. On a committed deletion, the plan is removed from `/plans`, the direct detail view becomes a generic unavailable state, and delayed or retried requests cannot restore it. On a retryable failure, interrupted operation, or reconciliation without a deletion commit, the accepted plan remains available and the recovery state explains the next safe action. An authorization or ownership failure uses the non-disclosing unavailable state and does not reveal whether the plan exists.
+
+The confirmation, submitting, recovering/interrupted, retryable-error, committed-deleted, and unavailable outcomes are all required states. A delete control that only exists as a backend capability or a one-time confirmation with no visible recovery behavior does not satisfy this contract.
+
 #### Learner progress action
 
 The focused item exposes a named learner action. While the action is being submitted, the control is disabled with a status announcement and the item remains visible. On success, the item status and summary update together. On a conflict or retryable failure, the control explains that the current state must be refreshed or retried; the UI does not guess a new progress state.
+
+#### Undo an incorrect completion
+
+When an item is `Completed by you`, the focused item and its outline entry must expose a clearly named reversible action such as `Undo completion` or `Mark as not complete`. The action is not optional merely because the item is complete:
+
+1. The learner activates the undo action for the item.
+2. The UI emits a learner progress intent with the opaque `itemId` and action kind `undo_completion`.
+3. While the intent is pending, the item remains visibly `Completed by you`, the undo control is disabled, and the result is announced.
+4. On success, the item returns to the domain-provided non-complete state (the first-release fixture uses `Not started`), the progress summary is recalculated, and the next action is recalculated from the accepted order.
+5. On conflict or retryable failure, the item remains `Completed by you` and the UI explains that the learner must refresh or retry. It must not show the unconfirmed non-complete state.
+
+For every current accepted item shown to an authorized learner, the view model includes an action object. Its action kind is `complete` while the item is not complete and `undo_completion` while the item is completed by the learner, unless the application supplies a disabled reason for a pending, unavailable, or conflicting operation. A completed item without an undo action is not a conforming view model.
 
 #### Deleted or unauthorized plan
 
@@ -154,6 +180,22 @@ The learner axis uses explicit subject labels:
 - **Action needs refresh** — the requested action encountered a stale-progress or retryable error; the UI must not display the unconfirmed target state as fact.
 
 The content state and learner state are independent. For example, “Plan update pending — 4 of 12 items completed by you” is valid and preferred over a single “pending” badge.
+
+### 3.3 Plan-deletion control state
+
+Deletion is a data-control lifecycle separate from content trust and learner progress:
+
+| Control state | Meaning | Required presentation |
+| --- | --- | --- |
+| `available` | The authorized learner may request deletion. | Show `Delete plan` with an accessible name and a clear destructive-action treatment. |
+| `confirming` | The learner must review the consequence before the application intent is emitted. | Name the plan, state irreversibility and 24-hour purge behavior, and provide explicit cancel and confirm controls. |
+| `submitting` | The confirmed delete intent is in progress. | Disable deletion and other plan mutations; announce that deletion is being processed; do not claim success yet. |
+| `recovering` | The deletion operation outcome is being reconciled after an interruption or lease expiry. | Keep the last accepted state until a durable deletion result exists and explain the recovery status. |
+| `failed_retryable` | No deletion commit was reported and the operation may be retried. | Keep the plan and offer a safe retry or refresh action. |
+| `deleted` | Durable deletion committed. | Remove the plan from lists and show only the generic unavailable result on a delayed direct route. |
+| `unavailable` | The actor is not authorized or the plan cannot be disclosed. | Do not show a deletion control, resource status, plan content, or an authorization-specific explanation. |
+
+The application may expose additional transport details outside the component, but `packages/ui` receives only the safe state and display message needed for these presentations.
 
 ## 4. Visual design tokens
 
@@ -289,7 +331,8 @@ The following component inventory is the minimum reusable surface for the first 
 | `MilestoneGroup` / `TopicGroup` | Preserves nested outline relationships and disclosure behavior. | Expanded, collapsed, empty optional summary, current descendant, learner-confirmed descendant. |
 | `PlanItemDetail` | Shows focused item content, status, action, and resources. | Not started, in progress, completed by you, action pending, action needs refresh, partial details, loading, invalid/unavailable. |
 | `ResourceList` | Renders safe plan-supplied resource labels and links. | Empty, one or many resources, opaque/unsupported display label, loading, unavailable link. |
-| `LearnerProgressAction` | Emits an explicit learner intent for a permitted item transition. | Enabled, disabled with reason, submitting, confirmed, conflict, retryable error, keyboard/touch focus. |
+| `LearnerProgressAction` | Emits an explicit learner intent for a permitted item transition. | Enabled, disabled with reason, submitting, confirmed, conflict, retryable error, keyboard/touch focus; a completed item exposes `Undo completion`. |
+| `PlanDataControls` | Exposes authorized plan-level data controls, including deletion. | Delete available, confirmation, submitting, recovering/interrupted, retryable error, deleted, unavailable, keyboard focus. |
 | `EmptyState` | Explains the absence of a plan or current content. | No plans, no selected item, no resources, no accepted revision. |
 | `LoadingState` | Communicates retrieval or action work without fake values. | Page loading, section loading, action pending, reduced motion. |
 | `RecoveryPanel` | Explains what can be retried, refreshed, or returned to. | Pending, recovering, interrupted, invalid, retryable, cancelled, expired, conflict. |
@@ -306,7 +349,8 @@ The following matrix defines the minimum presentation behavior. “Preserve” m
 | Outline | Structural placeholders | Explain no accepted plan or no outline | Show available accepted hierarchy; do not invent missing nodes | Preserve last accepted outline | Preserve last accepted outline while update status is visible | Mark item states with text and accessible semantics |
 | Focused item | Placeholder shape | Explain that no item is selected | Show available accepted detail and missing optional fields | Preserve accepted detail; no candidate content | Preserve accepted detail; action may be disabled while state is unresolved | Show current status and explicit action outcome |
 | Resources | Placeholder rows | “No resources supplied” | Show supplied resources only | Preserve accepted resources; omit unsafe/unaccepted content | Preserve accepted resources | Links remain available regardless of item completion unless the application disables them with a reason |
-| Progress action | Disabled until item state is known | Hidden or unavailable with explanation | Available only for an accepted current item | Disabled with safe reason | Disabled while the relevant action is unresolved | Enabled for the next permitted transition; confirmed result is announced |
+| Progress action | Disabled until item state is known | Hidden or unavailable with explanation | Available only for an accepted current item | Disabled with safe reason | Disabled while the relevant action is unresolved | Enabled for the next permitted transition; a completed item exposes `Undo completion` and the confirmed result is announced |
+| Plan data controls | Hidden until authorization and accepted plan state are known | Hidden | Available for an authorized accepted plan | Preserve the plan and show a safe retry/error state when deletion fails | Disable deletion while submitting or recovering; announce the operation without optimistic deletion | After committed deletion, remove the plan and show only the generic unavailable result on stale direct routes |
 
 ## 8. View-model boundary for `packages/ui`
 
@@ -352,6 +396,7 @@ PlanDetailViewModel {
   focusedItem?: PlanItemViewModel
   operation?: OperationStatusViewModel
   recovery?: RecoveryViewModel
+  dataControls?: PlanDataControlsViewModel
 }
 
 ProgressSummaryViewModel {
@@ -368,8 +413,26 @@ PlanItemViewModel {
   description?: DisplayText
   positionLabel: DisplayText
   progressState: "not_started" | "in_progress" | "completed_by_learner" | "action_pending" | "action_needs_refresh"
-  action?: LearnerActionViewModel
+  action: LearnerActionViewModel
   resources: ResourceViewModel[]
+}
+
+LearnerActionViewModel {
+  kind: "complete" | "undo_completion"
+  label: DisplayText
+  state: "available" | "submitting" | "confirmed" | "conflict" | "failed_retryable" | "unavailable"
+  enabled: boolean
+  disabledReason?: DisplayText
+}
+
+PlanDataControlsViewModel {
+  deletion: {
+    state: "available" | "confirming" | "submitting" | "recovering" | "failed_retryable" | "deleted" | "unavailable"
+    label: DisplayText
+    consequence?: DisplayText
+    enabled: boolean
+    disabledReason?: DisplayText
+  }
 }
 ```
 
@@ -380,7 +443,8 @@ PlanItemViewModel {
 Components accept only the fields required for their presentation responsibility. They may receive callbacks or equivalent intents such as:
 
 - select an item by its opaque `itemId`;
-- request a permitted learner action for an opaque `itemId`;
+- request a permitted learner action for an opaque `itemId`, with action kind `complete` or `undo_completion`;
+- confirm plan deletion by emitting a `delete_plan` intent with the opaque `planId`;
 - request a safe retry or refresh supplied by the application; and
 - navigate to a safe plan reference supplied by the application.
 
@@ -392,7 +456,10 @@ Those callbacks report intent. The UI does not perform persistence, authorizatio
 - The mapping preserves canonical order and stable IDs.
 - The mapping calculates progress summaries from stored learner-confirmed progress, not from candidate content or visual selection.
 - The mapping selects the next action deterministically: the first current item in canonical outline order that is not completed by the learner, unless the application explicitly marks it unavailable with a reason.
+- Every current accepted item shown to an authorized learner includes a `LearnerActionViewModel`; its action kind is `complete` for a non-complete item and `undo_completion` for an item in `completed_by_learner`.
+- Only an authorized accepted plan receives an enabled deletion control. Confirmation is a UI step; the application receives the `delete_plan` intent only after confirmation and owns the deletion outcome.
 - A pending, rejected, failed, cancelled, expired, or conflicted replacement contributes no content or progress to the accepted view model.
+- A submitted or recovering deletion does not optimistically remove the plan; a committed deletion removes it and subsequent direct-route data is mapped to generic `unavailable`.
 - A partial accepted plan is rendered as partial only when the accepted domain state says its required structure is valid and its optional content is absent.
 - Raw validation paths may be reduced to safe display messages; raw request bodies, credentials, internal traces, and provider-specific claims never enter a view model.
 
@@ -408,6 +475,10 @@ The dashboard uses direct, calm language:
 | Recovering operation | “We’re checking whether the update completed. Your current plan remains available.” |
 | Invalid submission | “This plan update needs attention.” Explain the bounded issue and next action; do not expose raw payload details. |
 | Learner progress | “Completed by you” and “4 of 12 items completed by you.” |
+| Undo completion | “Undo completion” or “Mark as not complete”; while submitting, keep “Completed by you” as the confirmed state. |
+| Delete plan | “Delete plan” followed by a confirmation that the action is irreversible and primary data will be purged within 24 hours. |
+| Deletion pending/recovery | “Deleting this plan…” or “We’re checking whether deletion completed.” Do not claim deletion until the durable result is known. |
+| Deletion failure | “The plan was not deleted. Try again.” Keep the accepted plan visible when no deletion commit exists. |
 | Retryable failure | “The update was not saved. Try again or refresh the current plan.” |
 | Conflict | “This plan changed elsewhere. Refresh before trying again.” |
 | Empty state | “No plan yet. A connected AI client can provide one for this dashboard.” |
@@ -441,6 +512,14 @@ The minimum fixture catalog is:
 | `conflict-stale-revision` | Accepted current revision, stale update message, and fresh-read guidance. |
 | `progress-action-pending` | Item remains in its last confirmed state while the learner action is submitted. |
 | `progress-conflict` | Stale-progress message with no unconfirmed target state displayed. |
+| `completed-item-with-undo` | A completed item visibly exposes `Undo completion` and a learner-confirmed completed state. |
+| `undo-completion-pending` | The item remains completed while the undo intent is submitted and announced. |
+| `undo-completion-failure` | A conflict or retryable undo failure preserves `Completed by you` and offers refresh/retry guidance. |
+| `delete-confirmation` | An authorized detail view exposes `Delete plan` and an accessible confirmation with irreversible/purge consequences. |
+| `delete-submitting` | Deletion is disabled, status is announced, and the accepted plan is not optimistically removed. |
+| `delete-recovering` | An interrupted or reconciling deletion keeps the last accepted state until its durable result is known. |
+| `delete-retryable` | A failed deletion keeps the plan available and offers a safe retry. |
+| `deleted-plan` | A committed deletion removes the plan from the collection and maps a delayed direct route to generic unavailable. |
 | `empty-no-plans` | Authenticated collection with no plans and external-client guidance. |
 | `unavailable-deleted-or-unauthorized` | Non-disclosing detail result and plan-list navigation. |
 | `compact-layout` / `wide-layout` | The same accepted fixture rendered at supported layout bands with preserved reading and focus order. |
@@ -458,6 +537,8 @@ Before Phase 3 is considered complete, reviewers must be able to point to:
 - accessible names, landmarks, headings, focus behavior, keyboard operation, contrast thresholds, text zoom/reflow, live-region, and reduced-motion criteria;
 - the component inventory and state matrix;
 - an explicit separation between operation/content status and learner-confirmed progress;
+- the authorized `Delete plan` affordance, accessible confirmation, application intent, pending/recovery/failure/success states, and non-disclosing unavailable behavior;
+- the required `Undo completion` action for completed items, including pending and failure behavior that preserves the last confirmed state;
 - view-model types and mapping rules that keep database, MCP, auth, and domain concerns out of `packages/ui`;
 - deterministic fixture scenarios for normal, empty, loading, partial, invalid, error, completed, revision, recovery, and progress states; and
 - boundaries and handoffs for Phases 4 through 10.
