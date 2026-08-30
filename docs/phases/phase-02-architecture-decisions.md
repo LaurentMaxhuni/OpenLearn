@@ -24,7 +24,7 @@ The Phase 1 product brief defines OpenLearn as a standalone dashboard and reusab
 - An authenticated dashboard handoff: accepted plan-view mutations return an opaque plan reference and stable dashboard URL that the calling AI client can present to the learner, with `/plans` as the returning-user landing route.
 - An MCP connection model using stdio locally and Streamable HTTP remotely, with explicit trust, origin, authorization, validation, and observability boundaries.
 - Retention and deletion assumptions for accepted plans, progress, request metadata, telemetry, backups, and learner-controlled deletion before schema work begins.
-- MCP lifecycle behavior for discovery, operation states, idempotency, timeout, cancellation, retries, duplicate requests, and preservation of the last accepted state.
+- MCP lifecycle behavior for discovery, operation states, idempotency, timeout, cancellation, retries, duplicate requests, abandoned-operation lease recovery, and preservation of the last accepted state.
 - Six focused [architecture decision records](../architecture/decisions/0001-application-stack-and-workspace.md): stack/workspace, components, persistence, deployment, identity, and MCP.
 - A written boundary map between the dashboard, application/domain logic, persistence, authentication, observability, and AI/MCP integration.
 - Local development and verification expectations that can be implemented without an undocumented machine state or live AI provider.
@@ -52,6 +52,7 @@ The Phase 1 product brief defines OpenLearn as a standalone dashboard and reusab
 - **Risk:** UI, domain, persistence, and integration responsibilities become coupled. **Decision:** Keep the dashboard and service independently deployable and route both HTTP and MCP requests through application ports.
 - **Risk:** MCP authorization or provider assumptions leak into unrelated application code, or dashboard and MCP credentials resolve to different owners. **Decision:** Use OIDC/OAuth-compatible adapter boundaries, require one canonical issuer for the first hosted flow, map it to an internal owner, and provide an explicit future linking path rather than matching by email or provider identity.
 - **Risk:** Learner progress or request state is lost across process changes. **Decision:** Store accepted domain state in PostgreSQL, use transactions and concurrency checks, externalize any bounded cross-instance integration state, and define replayable lifecycle outcomes.
+- **Risk:** A crashed instance leaves an `in_progress` operation with an uncertain commit. **Decision:** Use deadlines, recovery leases, fencing versions, an operation-linked mutation ledger, atomic terminal writes, and same-key reconciliation to `succeeded` or `expired`.
 - **Risk:** Schema work bakes in indefinite retention or makes deletion incomplete. **Decision:** Set minimum retention periods, immediate access revocation, bounded purge targets, backup handling, and no-resurrection invariants in the persistence boundary.
 - **Risk:** The learner receives no usable path from an external call to the dashboard. **Decision:** Return a stable authenticated plan URL/reference from accepted mutations and define the dashboard authentication, plan-route, and plan-list fallback flows.
 - **Risk:** External AI input becomes executable UI or bypasses ownership. **Decision:** Treat all MCP input as untrusted data, validate it before domain work, allow only OpenLearn-owned component states, and reject arbitrary code or markup.
@@ -66,7 +67,7 @@ The Phase 1 product brief defines OpenLearn as a standalone dashboard and reusab
 - Authentication assumptions identify the minimum allowed identity data and permission boundary.
 - Dashboard ownership association and the accepted-call-to-dashboard handoff are explicit.
 - Retention, deletion, backup, and learner-control assumptions are explicit before schema work.
-- MCP transport, authorization, trust, validation, lifecycle, failure, retry, cancellation, duplicate, timeout, and observability expectations are explicit.
+- MCP transport, authorization, trust, validation, lifecycle, failure, retry, cancellation, duplicate, timeout, abandoned-operation reconciliation, and observability expectations are explicit.
 - Phase 3 has clear inputs for its design-system, dashboard UX, accessibility, and state-work specification.
 
 ## Next phase

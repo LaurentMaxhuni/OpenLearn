@@ -18,7 +18,7 @@
 - External input is untrusted; MCP adapters must call application ports and must not access persistence directly.
 - Durable domain state is separated from transient transport and integration state; raw prompts, access tokens, and arbitrary generated markup are not persisted by default.
 - The first hosted release uses one canonical identity authority for dashboard and remote MCP ownership; it does not implicitly link principals from different issuers.
-- Accepted plan mutations return an authenticated dashboard handoff; MCP lifecycle outcomes, deduplication-marker retention, deletion behavior, and learner-control invariants are architecture constraints before implementation.
+- Accepted plan mutations return an authenticated dashboard handoff; MCP lifecycle outcomes, deduplication-marker retention, abandoned-operation recovery, deletion behavior, and learner-control invariants are architecture constraints before implementation.
 - The exact canonical plan schema belongs to Phase 4, and exact public MCP tool names and payloads belong to the contract work in Phases 4 and 6.
 - The repository is worked on through the existing checkout and the `phase-2-architecture` branch; no linked Git worktree is created.
 - The current repository has no runtime or test suite; implementation commands documented here are expectations for the scaffolded project, not claims about current availability.
@@ -83,7 +83,7 @@ Compare the selected split TypeScript stack and first-party UI package with a co
 
 - [x] **Step 1: Separate durable and transient state**
 
-Choose PostgreSQL as the durable store for plan revisions, learner progress, ownership references, and other accepted domain state. Keep MCP sessions, request lifecycle state, retry metadata, and token-exchange caches transient or bounded; retain a minimal mutation deduplication marker beyond full lifecycle-record expiry so a previously seen key cannot become a fresh mutation; define its expiry, plan deletion, account deletion, backup, and telemetry retention assumptions before schema work; never use process memory as the only source for state needed across instances.
+Choose PostgreSQL as the durable store for plan revisions, learner progress, ownership references, and other accepted domain state. Keep MCP sessions, request lifecycle state, retry metadata, and token-exchange caches transient or bounded; retain a minimal mutation deduplication marker beyond full lifecycle-record expiry so a previously seen key cannot become a fresh mutation; give every in-progress operation a deadline, recovery lease, fencing version, and operation-linked mutation reference so a later instance can record `succeeded` or `expired`; define its expiry, plan deletion, account deletion, backup, and telemetry retention assumptions before schema work; never use process memory as the only source for state needed across instances.
 
 - [x] **Step 2: Select the deployment and environment model**
 
@@ -95,7 +95,7 @@ Use an OIDC-compatible identity boundary for dashboard sessions and OAuth 2.1-co
 
 - [x] **Step 4: Define the MCP boundary**
 
-Use the official MCP TypeScript SDK, stdio for client-launched local integrations, and Streamable HTTP for remote integrations. Keep the remote endpoint stateless by default, validate Origin and bearer-token audience, route tool calls through application services, return structured results with an opaque operation ID and dashboard handoff, define discovery/state/timeout/cancellation/retry/idempotency behavior, reject arbitrary code or markup, and preserve request IDs and redacted lifecycle telemetry.
+Use the official MCP TypeScript SDK, stdio for client-launched local integrations, and Streamable HTTP for remote integrations. Keep the remote endpoint stateless by default, validate Origin and bearer-token audience, route tool calls through application services, return structured results with an opaque operation ID and dashboard handoff, define discovery/state/timeout/cancellation/retry/idempotency and abandoned-operation reconciliation behavior, reject arbitrary code or markup, and preserve request IDs and redacted lifecycle telemetry.
 
 - [x] **Step 5: Record alternatives and revisit conditions**
 
@@ -136,7 +136,7 @@ Update both the roadmap table and Phase 2 status, deliverables, risks, exit crit
 
 - [x] **Step 1: Check the Phase 2 deliverables**
 
-Use `rg` and a small PowerShell assertion to verify the selected stack/package approach, component strategy, durable/transient boundary, deployment/environment model, one-owner identity association, dashboard handoff, retention assumptions, MCP lifecycle model, ADR links, boundary map, and local verification contract are all present.
+Use `rg` and a small PowerShell assertion to verify the selected stack/package approach, component strategy, durable/transient boundary, deployment/environment model, one-owner identity association, dashboard handoff, retention assumptions, MCP lifecycle and abandoned-operation recovery model, ADR links, boundary map, and local verification contract are all present.
 
 - [x] **Step 2: Resolve public and architecture links**
 

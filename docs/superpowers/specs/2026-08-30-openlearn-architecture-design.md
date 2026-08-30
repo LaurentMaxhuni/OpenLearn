@@ -91,7 +91,7 @@ The UI package may depend on shared domain-facing view-model types, but the doma
 1. A dashboard request or MCP tool call arrives with an actor context established by the relevant authentication boundary.
 2. The adapter checks transport-level requirements, request size, correlation metadata, and capability permissions.
 3. The application service validates the command against the versioned domain contract and applies the permitted state transition.
-4. A persistence transaction writes accepted domain state and its revision or progress change. Duplicate requests use an idempotency key or equivalent version check.
+4. A persistence transaction writes accepted domain state and its revision or progress change together with the terminal operation outcome and minimal deduplication marker. Duplicate requests use an idempotency key or equivalent version check.
 5. The service returns a structured result containing the outcome, stable identifiers, current state, a dashboard handoff when a plan view exists, and safe learner-facing or client-facing error information.
 6. The dashboard converts query results into view models and renders the appropriate component state. The MCP adapter converts the same application result into protocol-shaped output.
 
@@ -123,20 +123,22 @@ Learner-control invariants are transport-independent: all reads and mutations us
 
 After protocol initialization, standard capability discovery exposes only operations allowed for the authenticated actor and advertised contract version, without learner data. The first capability groups are plan-view creation or revision, authorized plan-view retrieval, and learner-authorized progress actions.
 
-Every mutation has an opaque operation ID and a required idempotency key. The bounded state machine is:
+Every mutation has an opaque operation ID, a required idempotency key, a deadline, a recovery lease, and a fencing version. The bounded state machine is:
 
 ```text
 received -> in_progress -> succeeded
-                      \-> rejected
-                      \-> failed_retryable
-                      \-> cancelled
-                      \-> expired
-                      \-> conflict
+                      |-> rejected
+                      |-> failed_retryable
+                      |-> cancelled
+                      |-> expired
+                      |-> conflict
+                      `-> reconciling -> succeeded
+                                      `-> expired
 ```
 
-`rejected` covers validation or authorization without a domain write. `failed_retryable` means no commit occurred and the same idempotency key may be retried. `expired` means the bounded deadline elapsed before commit. `cancelled` means cancellation was accepted before commit. `conflict` means stale state or a changed request fingerprint for an existing key. Only `in_progress` is non-terminal.
+`rejected` covers validation or authorization without a domain write. `failed_retryable` means no commit occurred and the same idempotency key may be retried. `expired` means the bounded deadline or recovery lease elapsed before a domain commit was found. `cancelled` means cancellation was accepted before commit. `conflict` means stale state or a changed request fingerprint for an existing key. `reconciling` is entered after an `in_progress` lease expires and is bounded by the recovery attempt. `in_progress` and `reconciling` are non-terminal.
 
-The first synchronous implementation uses a bounded request deadline with a 30-second target. Cancellation is honored before commit; after commit it cannot roll back state and returns the committed outcome. Reads may be retried. Mutations retry only with the same owner, capability, idempotency key, and request fingerprint; matching keys replay or return the existing operation while full operation details exist, changed fingerprints conflict, and mutations without a key are rejected. A retryable failure may be retried with the same key only while its full operation record is available. A transport disconnect is only a best-effort cancellation signal. Full lifecycle and response details expire 24 hours after completion or expiration, but the minimal key-to-outcome marker remains while the owning account exists and for 35 days after account deletion. It replays committed outcomes or returns terminal non-creation outcomes and never turns a previously seen key into a fresh mutation. Failure, cancellation, expiration, and conflict preserve the last accepted plan.
+The first synchronous implementation uses a bounded request deadline with a 30-second target and a recovery lease that expires after a bounded 10-second grace period. A same-key request before lease expiry returns `in_progress`; a same-key request after lease expiry or a bounded startup/maintenance sweep claims `reconciling` with compare-and-set and a fencing version. Reconciliation checks the durable mutation or mutation-ledger entry by operation ID and request-fingerprint digest: a matching committed entry becomes `succeeded`, while no matching entry becomes `expired` with no domain write. The final domain mutation, terminal outcome, and deduplication marker are committed together, and an old worker cannot finalize after takeover. Cancellation is honored before commit; after commit it cannot roll back state and returns the committed outcome. Reads may be retried. Mutations retry only with the same owner, capability, idempotency key, and request fingerprint; matching keys replay or return the existing operation while full operation details exist, changed fingerprints conflict, and mutations without a key are rejected. A retryable failure may be retried with the same key only while its full operation record is available. A transport disconnect is only a best-effort cancellation signal. Full lifecycle and response details expire 24 hours after completion or expiration, but the minimal key-to-outcome marker remains while the owning account exists and for 35 days after account deletion. It replays committed outcomes or returns terminal non-creation outcomes and never turns a previously seen key into a fresh mutation. Failure, cancellation, expiration, and conflict preserve the last accepted plan.
 
 ## Environment model
 
@@ -158,7 +160,7 @@ No environment may depend on a developer's undocumented global database, provide
 
 ## Phase 3 handoff
 
-Phase 3 can design the dashboard against a stable ownership boundary: React components render explicit view models supplied by the dashboard application, while pending, partial, invalid, failed, cancelled, interrupted, retryable, and learner-confirmed states remain visible. It should include the authenticated `/plans` landing route and `/plans/{plan_id}` handoff route without introducing MCP request objects, authentication claims, or database records into component props.
+Phase 3 can design the dashboard against a stable ownership boundary: React components render explicit view models supplied by the dashboard application, while pending, partial, invalid, failed, cancelled, interrupted, recovering, retryable, and learner-confirmed states remain visible. It should include the authenticated `/plans` landing route and `/plans/{plan_id}` handoff route without introducing MCP request objects, authentication claims, or database records into component props.
 
 ## References
 

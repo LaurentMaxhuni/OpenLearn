@@ -18,10 +18,11 @@ Durable domain state includes:
 - learner progress and the state transitions that the product permits; and
 - the minimum audit metadata needed to explain ownership, revision, and progress changes.
 
-Bounded integration state includes:
+Bounded or lifecycle-scoped integration state includes:
 
 - MCP session metadata when a transport requires it;
 - request correlation and lifecycle status;
+- operation deadline, recovery lease, and fencing version;
 - idempotency or deduplication records with an explicit expiry policy;
 - retry, timeout, and cancellation metadata; and
 - short-lived authorization or capability-discovery caches.
@@ -40,7 +41,11 @@ These are product and architecture assumptions, not a claim that the current doc
 
 Learners can delete a plan from the dashboard. Deletion is immediately effective for reads and writes across dashboard and MCP paths; an old operation, idempotency key, or restored backup cannot recreate it. Creating a new plan after deletion requires a new authorized operation. There are no anonymous production share links.
 
-Domain writes use transactions. Plan revisions and learner progress use explicit version or optimistic-concurrency checks, and external mutations require an idempotency key or equivalent request identity so retries cannot silently overwrite confirmed state. Schema migrations are versioned, reviewable, and run separately from application startup when the deployment environment requires it.
+Domain writes use transactions. Plan revisions and learner progress use explicit version or optimistic-concurrency checks, and external mutations require an idempotency key or equivalent request identity so retries cannot silently overwrite confirmed state. Every accepted mutation records its operation ID, owner/capability scope, request-fingerprint digest, and resource or revision reference in a durable mutation ledger. The domain mutation, terminal operation outcome, and minimal deduplication marker are committed in one PostgreSQL transaction, so a successful domain commit cannot lack a terminal outcome under the normal path.
+
+The initial `in_progress` reservation records a deadline, a recovery lease, and a fencing version. If a service instance disappears, a same-key request or bounded service maintenance sweep claims an expired lease with compare-and-set, increments the fencing version, and enters reconciliation. Reconciliation checks the mutation ledger: a matching committed entry becomes `succeeded`; no matching entry becomes `expired` with no domain write; a mismatched entry fails closed as `conflict`. The final write is accepted only for the current fencing version, so an old instance cannot commit after takeover. Retryable expiration reopens the same logical operation with the same key while the full operation record is retained; it never creates an untracked second operation.
+
+Schema migrations are versioned, reviewable, and run separately from application startup when the deployment environment requires it.
 
 The exact tables, fields, indexes, and plan serialization are Phase 4 work. This decision establishes ownership and storage semantics, not the canonical domain schema.
 
