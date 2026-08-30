@@ -14,6 +14,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm run build && node -e \"const fs = require('node:fs'); fs.mkdirSync('dist/test', { recursive: true }); fs.writeFileSync('dist/test/empty.test.js', '')\" && node --test dist/test/*.test.js"
+    "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js"
   }
 }
