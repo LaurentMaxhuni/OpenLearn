@@ -93,3 +93,71 @@ Preserved unrelated pre-existing change:
 ## Concerns
 
 The environment has Node `22.22.1`, while the task requires Node `>=24.0.0 <25.0.0`; pnpm therefore reports an engine warning. The pinned pnpm `10.15.0` installation and all checks still succeeded on this host. Validation under Node 24 remains recommended when that runtime is available.
+
+## Round 1 fix report
+
+### Finding addressed
+
+Added the `@openlearn/domain` package boundary in `packages/domain/package.json`:
+
+- `main`: `./dist/index.js`
+- `types`: `./dist/index.d.ts`
+- `exports["."]["types"]`: `./dist/index.d.ts`
+- `exports["."]["import"]`: `./dist/index.js`
+
+Updated `tsconfig.build.json` to emit the empty public entry directly as `dist/index.js` and `dist/index.d.ts`. No runtime dependency or domain behavior was added. The deferred synthesized-empty-test harness observation was not changed.
+
+### Tests, commands, and output
+
+Package-boundary test, run from `packages/domain`:
+
+```text
+pnpm --filter @openlearn/domain build
+> @openlearn/domain@0.0.0 build C:\github-projects\OpenLearn\packages\domain
+> tsc -p tsconfig.build.json
+
+node --input-type=module -e "const module = await import('@openlearn/domain'); if (Object.keys(module).length !== 0) throw new Error('entry point is not empty'); console.log('package boundary ok: ESM import resolved with empty exports')"
+package boundary ok: ESM import resolved with empty exports
+
+dist/index.js and dist/index.d.ts existence check: passed
+```
+
+Full verification, run from the repository root:
+
+```text
+pnpm run verify
+> openlearn@ verify C:\github-projects\OpenLearn
+> pnpm run typecheck && pnpm run test && pnpm run build
+
+> @openlearn/domain@0.0.0 typecheck C:\github-projects\OpenLearn\packages\domain
+> tsc --noEmit
+
+> @openlearn/domain@0.0.0 test C:\github-projects\OpenLearn\packages\domain
+> pnpm run build && node -e "const fs = require('node:fs'); fs.mkdirSync('dist/test', { recursive: true }); fs.writeFileSync('dist/test/empty.test.js', '')" && node --test dist/test/*.test.js
+
+TAP version 13
+# Subtest: dist\\test\\empty.test.js
+ok 1 - dist\\test\\empty.test.js
+1..1
+# tests 1
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+
+> @openlearn/domain@0.0.0 build C:\github-projects\OpenLearn\packages\domain
+> tsc -p tsconfig.build.json
+```
+
+`pnpm run verify` and `git diff --check` exited with code 0. The only output concern is the existing Node `v22.22.1` versus required Node 24 engine warning. The first full-verification invocation from `packages/domain` reported `ERR_PNPM_NO_SCRIPT` for root-only `verify`; rerunning from `C:\github-projects\OpenLearn` passed as shown above.
+
+### Fix files and commit
+
+Changed:
+
+- `packages/domain/package.json`
+- `packages/domain/tsconfig.build.json`
+- This report
+
+The fix was committed separately after verification. The pre-existing untracked Phase 4 plan remained unmodified and unstaged.
