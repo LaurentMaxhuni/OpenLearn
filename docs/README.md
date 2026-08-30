@@ -6,6 +6,8 @@ This directory explains the product direction and contributor-facing delivery se
 
 Start with the [project roadmap](ROADMAP.md). It gives the complete phase order, current status, expected outcome, and handoff for each stage of the project.
 
+The [Phase 1 product brief](product-brief.md) records the bounded relationship between an external AI client, OpenLearn's reusable components and dashboard, and the learner experience.
+
 The detailed phase documents are listed below:
 
 1. [Phase 0: Repository foundation](phases/phase-00-repository-foundation.md)
