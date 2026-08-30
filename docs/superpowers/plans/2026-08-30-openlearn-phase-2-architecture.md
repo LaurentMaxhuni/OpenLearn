@@ -18,7 +18,7 @@
 - External input is untrusted; MCP adapters must call application ports and must not access persistence directly.
 - Durable domain state is separated from transient transport and integration state; raw prompts, access tokens, and arbitrary generated markup are not persisted by default.
 - The first hosted release uses one canonical identity authority for dashboard and remote MCP ownership; it does not implicitly link principals from different issuers.
-- Accepted plan mutations return an authenticated dashboard handoff; MCP lifecycle outcomes, retention periods, deletion behavior, and learner-control invariants are architecture constraints before implementation.
+- Accepted plan mutations return an authenticated dashboard handoff; MCP lifecycle outcomes, deduplication-marker retention, deletion behavior, and learner-control invariants are architecture constraints before implementation.
 - The exact canonical plan schema belongs to Phase 4, and exact public MCP tool names and payloads belong to the contract work in Phases 4 and 6.
 - The repository is worked on through the existing checkout and the `phase-2-architecture` branch; no linked Git worktree is created.
 - The current repository has no runtime or test suite; implementation commands documented here are expectations for the scaffolded project, not claims about current availability.
@@ -83,7 +83,7 @@ Compare the selected split TypeScript stack and first-party UI package with a co
 
 - [x] **Step 1: Separate durable and transient state**
 
-Choose PostgreSQL as the durable store for plan revisions, learner progress, ownership references, and other accepted domain state. Keep MCP sessions, request lifecycle state, retry metadata, deduplication keys, and token-exchange caches transient or bounded; define their expiry, plan deletion, account deletion, backup, and telemetry retention assumptions before schema work; never use process memory as the only source for state needed across instances.
+Choose PostgreSQL as the durable store for plan revisions, learner progress, ownership references, and other accepted domain state. Keep MCP sessions, request lifecycle state, retry metadata, and token-exchange caches transient or bounded; retain a minimal mutation deduplication marker beyond full lifecycle-record expiry so a previously seen key cannot become a fresh mutation; define its expiry, plan deletion, account deletion, backup, and telemetry retention assumptions before schema work; never use process memory as the only source for state needed across instances.
 
 - [x] **Step 2: Select the deployment and environment model**
 

@@ -35,7 +35,7 @@ The Phase 1 product brief defines OpenLearn as a standalone dashboard and reusab
 - **Boundary design:** Keep dashboard components, application services, domain state, persistence adapters, authentication, and MCP transport behind explicit dependency directions.
 - **MCP connection model:** Use stdio for local client-launched integrations and Streamable HTTP for remote integrations, with OAuth-compatible authorization and untrusted-input validation at the boundary.
 - **Ownership and handoff:** Resolve both hosted entry points to one internal owner through a shared canonical issuer, and return an authenticated dashboard URL/reference for the calling client to present to the learner.
-- **Lifecycle and retention:** Keep request lifecycle state separate from learner-domain state, make mutation outcomes replayable and bounded, and establish deletion/retention invariants before schema implementation.
+- **Lifecycle and retention:** Keep request lifecycle state separate from learner-domain state, make mutation outcomes replayable with a durable minimal deduplication marker beyond full-record retention, and establish deletion/retention invariants before schema implementation.
 - **Decision records:** Capture one focused ADR for each consequential choice, including alternatives, consequences, references, and revisit conditions.
 - **Implementation handoff:** Define the logical workspace, environment configuration, local database dependency, fixture strategy, and verification contract for the next phases.
 
