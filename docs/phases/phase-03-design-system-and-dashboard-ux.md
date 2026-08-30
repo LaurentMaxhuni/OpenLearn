@@ -27,7 +27,7 @@ The dashboard will be the learner's primary view of a generated plan. Clear hier
 - [x] Empty, loading, partial, invalid, interrupted, recovering, and recoverable-error states.
 - [x] A clear distinction between learner-confirmed state and untrusted or pending externally supplied content.
 - [x] Deterministic fixture guidance and a framework-neutral `packages/ui` view-model boundary.
-- [x] An authorized dashboard `Delete plan` action with accessible confirmation, pending/recovery/failure, committed-deletion, and non-disclosing unavailable states.
+- [x] An authorized dashboard `Delete plan` action with a non-modal accessible confirmation disclosure, defined focus behavior, pending/recovery/failure, conflict/fresh-read, committed-deletion, and non-disclosing unavailable states.
 - [x] A required `Undo completion` action for completed learner items, including pending and failure behavior that preserves confirmed state.
 
 ## Workstreams
@@ -62,7 +62,7 @@ The specification satisfies the Phase 3 exit criteria and creates the documented
 - [x] Responsive behavior is defined for supported viewport sizes and interaction modes.
 - [x] Accessibility acceptance criteria cover names, focus, keyboard behavior, contrast, text, and motion.
 - [x] Empty, loading, partial, invalid, and error states are specified before Phase 4 begins.
-- [x] Required learner data-control and reversible-progress actions are specified with accessible confirmation, application intents, and recovery behavior.
+- [x] Required learner data-control and reversible-progress actions are specified with accessible confirmation, application intents, preserved confirmed state, and recovery behavior.
 
 ## Next phase
 
