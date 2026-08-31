@@ -15,5 +15,8 @@
     "@openlearn/application": "workspace:*",
     "@openlearn/mcp": "workspace:*",
     "fastify": "^5.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0"
   }
 }
