@@ -305,15 +305,15 @@
 
 **Steps**
 
-- [ ] Run pnpm install --frozen-lockfile.
-- [ ] Run pnpm run verify, which must execute typecheck, tests, and build.
-- [ ] Run git diff --check and a marker scan for TODO, TBD, FIXME, and unresolved placeholder language in changed files.
-- [ ] Review the final domain API and tests against ADR 0003 for persistence and accepted-state boundaries, ADR 0005 for canonical issuer and subject ownership mapping, ADR 0006 for MCP lifecycle and trust-boundary guarantees, the completed Phase 3 UX specification, the product brief, and the Phase 4 specification.
-- [ ] Confirm all Phase 4 deliverables are evidenced: glossary, entities and relationships, IDs and ordering, content requirements, normalization and validation, malformed and stale behavior, lifecycle and accepted state, revision CAS and replacement, last-accepted preservation, confirmed progress, actions and transitions, ownership, dashboard handoff, errors, deletion and retention, fixtures, boundaries, and scoped open questions.
-- [ ] Change the Phase 4 specification status from Draft for review to Accepted only when implementation and review evidence satisfy its checklist. Add an implementation note naming @openlearn/domain and the deterministic fixtures.
-- [ ] Mark docs/phases/phase-04-learning-plan-domain-model.md Complete and link the accepted specification only after all exit criteria pass. Set the next phase to Phase 5 only if no Phase 4 requirement remains unresolved.
-- [ ] Update ROADMAP.md and index documentation only with evidence-backed status; do not describe MCP, persistence, dashboard, or UI implementation as complete.
-- [ ] Commit as feat: complete phase 4 learning plan domain.
+- [x] Run pnpm install --frozen-lockfile.
+- [x] Run pnpm run verify, which must execute typecheck, tests, and build.
+- [x] Run git diff --check and a marker scan for TODO, TBD, FIXME, and unresolved placeholder language in changed files.
+- [x] Review the final domain API and tests against ADR 0003 for persistence and accepted-state boundaries, ADR 0005 for canonical issuer and subject ownership mapping, ADR 0006 for MCP lifecycle and trust-boundary guarantees, the completed Phase 3 UX specification, the product brief, and the Phase 4 specification.
+- [x] Confirm all Phase 4 deliverables are evidenced: glossary, entities and relationships, IDs and ordering, content requirements, normalization and validation, malformed and stale behavior, lifecycle and accepted state, revision CAS and replacement, last-accepted preservation, confirmed progress, actions and transitions, ownership, dashboard handoff, errors, deletion and retention, fixtures, boundaries, and scoped open questions.
+- [x] Change the Phase 4 specification status from Draft for review to Accepted only when implementation and review evidence satisfy its checklist. Add an implementation note naming @openlearn/domain and the deterministic fixtures.
+- [x] Mark docs/phases/phase-04-learning-plan-domain-model.md Complete and link the accepted specification only after all exit criteria pass. Set the next phase to Phase 5 only if no Phase 4 requirement remains unresolved.
+- [x] Update ROADMAP.md and index documentation only with evidence-backed status; do not describe MCP, persistence, dashboard, or UI implementation as complete.
+- [x] Commit as feat: complete phase 4 learning plan domain.
 
 ## Task 10: Perform final branch review and push
 

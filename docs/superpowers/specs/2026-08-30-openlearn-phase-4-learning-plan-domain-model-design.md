@@ -1,12 +1,14 @@
 # OpenLearn Phase 4: Learning-plan domain-model specification
 
-**Status:** Draft for review
+**Status:** Accepted
 
 **Phase:** 4 - Learning-plan domain model
 
 **Purpose:** Define the canonical, framework-neutral domain contract for accepted learning plans, revisions, learner-confirmed progress, ownership, validation, deletion, and the safe presentation handoff.
 
 **Scope:** This specification defines domain concepts and their invariants. It does not select an ORM, database schema, migration tool, MCP SDK, exact MCP tool names, provider payloads, HTTP routes beyond the already accepted dashboard references, or a frontend framework.
+
+**Implementation note:** The Phase 4 contract is implemented by the pure `@openlearn/domain` package in `packages/domain`. Its deterministic fixture exports are the handoff artifacts for later phases; persistence, MCP, UI, provider adapters, and application operation lifecycle remain outside this package.
 
 ## 1. Boundary and normative language
 
@@ -796,4 +798,4 @@ Before Phase 4 is marked complete, reviewers must be able to point to:
 - explicit handoffs to Phases 5, 6, 7, 8, 9, and 10; and
 - no unresolved Phase 4 decision disguised as an implementation detail.
 
-**Phase 4 status at this draft:** Not complete. The contract must pass review and its exit criteria must be verified before the phase document or roadmap changes to Complete.
+**Phase 4 status:** Complete. The contract is implemented and verified by the `@openlearn/domain` package, its deterministic fixtures, focused contract tests, and workspace verification. Later integration, persistence, UI, and operations work remains intentionally outside this phase.
