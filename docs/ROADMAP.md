@@ -17,8 +17,8 @@ This roadmap describes the sequence from the current repository foundation to a 
 | 2. Architecture and technology decisions | Complete | Recorded dashboard, service, persistence, identity, and MCP boundaries | [Details](phases/phase-02-architecture-decisions.md) |
 | 3. Design system and dashboard UX | Complete | Responsive, accessible visual language and dashboard states | [Details](phases/phase-03-design-system-and-dashboard-ux.md) |
 | 4. Learning-plan domain model | Complete | Validated canonical plan contract | [Details](phases/phase-04-learning-plan-domain-model.md) |
-| 5. Application shell and static dashboard | Next | Navigable dashboard using deterministic seeded data | [Details](phases/phase-05-application-shell-and-static-dashboard.md) |
-| 6. MCP integration and AI orchestration | Planned | Validated, observable boundary for AI-generated plans | [Details](phases/phase-06-mcp-integration-and-ai-orchestration.md) |
+| 5. Application shell and static dashboard | Complete | Navigable dashboard using deterministic seeded data | [Details](phases/phase-05-application-shell-and-static-dashboard.md) |
+| 6. MCP integration and AI orchestration | Next | Validated, observable boundary for AI-generated plans | [Details](phases/phase-06-mcp-integration-and-ai-orchestration.md) |
 | 7. Interactive learning experience and progress | Planned | Persistent learner actions and meaningful progress state | [Details](phases/phase-07-interactive-learning-and-progress.md) |
 | 8. Personalization and learner feedback | Planned | Consent-aware plan adjustments and feedback loops | [Details](phases/phase-08-personalization-and-learner-feedback.md) |
 | 9. Quality, security, accessibility, and performance | Planned | Verified quality, safety, accessibility, and performance gates | [Details](phases/phase-09-quality-security-accessibility-and-performance.md) |

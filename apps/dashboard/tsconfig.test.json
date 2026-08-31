@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": false,
+    "rootDir": "../..",
+    "outDir": "dist-test"
+  },
+  "include": ["src/router.ts", "src/view-model.ts", "test/**/*.ts"]
+}
