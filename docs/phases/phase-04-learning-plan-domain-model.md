@@ -2,11 +2,17 @@
 
 ## Status
 
-Planned
+Complete
+
+## Implementation evidence
+
+The framework-neutral `@openlearn/domain` package in `packages/domain` implements canonical normalization and validation, accepted revisions, learner progress transitions, owner-scoped deletion and retention, deterministic fixtures, and the dashboard-safe snapshot boundary. It has no runtime UI, web, persistence, MCP, identity-provider, or provider SDK dependency.
 
 ## Objective
 
 Define the canonical learning-plan contract that safely connects AI or MCP input, persistence, learner actions, and dashboard rendering.
+
+[Accepted specification](../superpowers/specs/2026-08-30-openlearn-phase-4-learning-plan-domain-model-design.md)
 
 ## Why this phase matters
 
