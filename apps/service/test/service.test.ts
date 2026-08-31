@@ -4,7 +4,7 @@ import type {
   ActorContext,
   OpenLearnApplication,
 } from '@openlearn/application';
-import { createService } from '../src/index.js';
+import { createService, startStdio } from '../src/index.js';
 
 const actor: ActorContext = {
   ownerId: 'owner-service-test' as ActorContext['ownerId'],
@@ -215,4 +215,22 @@ test('reports readiness failure without exposing dependency details', async () =
   } finally {
     await service.app.close();
   }
+});
+
+test('fails closed when the explicit stdio authenticator cannot resolve an actor', async () => {
+  const calls: string[] = [];
+  let failed = false;
+  try {
+    await startStdio({
+      application: application(calls),
+      authenticateHttp: async () => actor,
+      authenticateStdio: async () => undefined,
+      operationIds: { next: () => 'service-operation' },
+    });
+  } catch {
+    failed = true;
+  }
+
+  assert.equal(failed, true);
+  assert.deepEqual(calls, []);
 });
