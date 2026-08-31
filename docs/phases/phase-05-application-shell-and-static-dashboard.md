@@ -2,7 +2,13 @@
 
 ## Status
 
-Planned
+Complete
+
+## Implementation evidence
+
+Phase 5 is implemented in `apps/dashboard` and `packages/ui`. The dashboard provides browser-history navigation for `/plans` and `/plans/:planId`, maps deterministic Phase 4 snapshots into presentation-only view models, and exposes a labeled static preview selector for accepted, partial, completed, empty, loading, invalid, retryable, pending, recovering, and conflict states. The UI package supplies reusable semantic components for trust, goal/context, progress, next action, outline, focused item, resources, recovery, and plan data controls.
+
+The shell and components keep live authentication, persistence, AI, MCP, provider, and network concerns outside the presentation boundary. Focus management, keyboard-operable disclosures, live status regions, safe resource rendering, responsive layout tokens, and reduced-motion behavior are covered by the implementation and review checks. `pnpm run verify` passes on the available environment; pnpm reports an existing Node 22 versus the repository's Node 24 engine baseline warning.
 
 ## Objective
 
