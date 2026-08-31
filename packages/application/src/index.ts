@@ -37,3 +37,7 @@ export type {
   TelemetrySink,
 } from './ports.js';
 export type { ApplicationTransaction } from './transactions.js';
+export { createApplication } from './use-cases.js';
+export type { OpenLearnApplication } from './use-cases.js';
+export { createMemoryApplicationState } from './testing/memory-state.js';
+export type { MemoryApplicationState } from './testing/memory-state.js';

@@ -9,6 +9,7 @@ import type {
 import type { ApplicationTransaction } from './transactions.js';
 import type {
   PlanAggregate,
+  IdentityAllocator,
   PlanId,
 } from '@openlearn/domain';
 
@@ -38,6 +39,7 @@ export interface TelemetrySink {
 
 export interface ApplicationDependencies {
   readonly state: ApplicationStatePort;
+  readonly allocator: IdentityAllocator;
   readonly clock: Clock;
   readonly operationIds: OperationIdGenerator;
   readonly telemetry?: TelemetrySink;
