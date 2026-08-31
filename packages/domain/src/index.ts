@@ -1,5 +1,10 @@
 export { DOMAIN_LIMITS } from './limits.js';
 export {
+  normalizePlanContent,
+  type NormalizedPlanContent,
+} from './normalize.js';
+export { validatePlanCandidate } from './validation.js';
+export {
   DOMAIN_ERROR_CATEGORIES,
   fail,
   succeed,
