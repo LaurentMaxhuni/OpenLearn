@@ -70,6 +70,10 @@ export interface PlanHandoff {
   readonly dashboardUrl: string;
 }
 
+export interface PlanView extends AcceptedPlanSnapshot {
+  readonly dashboardUrl: string;
+}
+
 export interface CreatePlanViewInput {
   readonly idempotencyKey: string;
   readonly candidate: unknown;

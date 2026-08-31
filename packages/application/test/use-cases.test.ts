@@ -70,6 +70,7 @@ test('creates an accepted plan, returns a controlled handoff, and reads its snap
   });
   assert.equal(read.outcome, 'succeeded');
   assert.equal(read.value?.planId, created.value.planId);
+  assert.equal(read.value?.dashboardUrl, created.value.dashboardUrl);
 });
 
 test('replaces a plan only with the expected revision and preserves the handoff contract', async () => {

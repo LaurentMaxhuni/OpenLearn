@@ -5,14 +5,9 @@ import {
   readOwnedAcceptedSnapshot,
   replacePlan,
   type DomainFailure,
-  type IdentityAllocator,
 } from '@openlearn/domain';
 import type {
   ActivePlanAggregate,
-  AcceptedPlanSnapshot,
-  CanonicalPlanContent,
-  IdentityAllocator as DomainIdentityAllocator,
-  InternalOwnerId,
   PlanId,
   PlanItemId,
   RevisionId,
@@ -37,6 +32,7 @@ import type {
   CreatePlanViewInput,
   GetPlanViewInput,
   PlanHandoff,
+  PlanView,
   ProgressAction,
   SafeApplicationError,
   StoredOperationOutcome,
@@ -54,7 +50,7 @@ export interface OpenLearnApplication {
   getPlanView(
     actor: ActorContext,
     input: GetPlanViewInput,
-  ): Promise<ApplicationResult<AcceptedPlanSnapshot>>;
+  ): Promise<ApplicationResult<PlanView>>;
   applyProgressAction(
     actor: ActorContext,
     input: ApplyProgressActionInput,
@@ -216,15 +212,6 @@ const safeFingerprint = (
   }
 };
 
-const idFailure = <T>(
-  operationId: string,
-  value: string,
-  kind: 'plan' | 'revision' | 'plan_item',
-): ApplicationResult<T> => {
-  const parsed = brandIdentifier(kind, value);
-  return parsed.ok ? invalidReference(operationId) : invalidReference(operationId);
-};
-
 const parsePlanId = (
   operationId: string,
   value: string,
@@ -275,7 +262,7 @@ export const createApplication = (
   const readPlan = async (
     actor: ActorContext,
     input: GetPlanViewInput,
-  ): Promise<ApplicationResult<AcceptedPlanSnapshot>> => {
+  ): Promise<ApplicationResult<PlanView>> => {
     const operationId = dependencies.operationIds.next();
     if (!hasCapability(actor, 'plan:read')) {
       return missingCapability(operationId, 'plan:read');
@@ -310,7 +297,13 @@ export const createApplication = (
     }
     return applicationSuccess(
       { operationId, state: 'succeeded' },
-      snapshot.value,
+      {
+        ...snapshot.value,
+        dashboardUrl: new URL(
+          `/plans/${encodeURIComponent(snapshot.value.planId)}`,
+          origin,
+        ).toString(),
+      },
     );
   };
 

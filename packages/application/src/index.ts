@@ -17,6 +17,7 @@ export {
   type OperationState,
   type OperationView,
   type PlanHandoff,
+  type PlanView,
   type ProgressAction,
   type SafeApplicationError,
   type StoredOperationOutcome,
