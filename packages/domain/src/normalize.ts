@@ -22,16 +22,13 @@ import type {
   LongText,
   Milestone,
   NonEmptyReadonlyArray,
+  NormalizedPlanContent,
   PlanItem,
   Resource,
   SafeHttpsUrl,
   ShortText,
   Topic,
 } from './types.js';
-
-export interface NormalizedPlanContent extends CanonicalPlanContent {
-  readonly missingOptionalPaths: readonly string[];
-}
 
 type InputRecord = Record<string, unknown>;
 type TextKind = 'short' | 'long' | 'opaque' | 'url';
@@ -113,6 +110,9 @@ const isRecord = (value: unknown): value is InputRecord =>
 const hasOwn = (record: InputRecord, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(record, key);
 
+const identifierKey = (kind: IdentifierKind, value: string): string =>
+  `${kind}:${value}`;
+
 const childPath = (parent: string, child: string): string =>
   parent.length === 0 ? child : `${parent}.${child}`;
 
@@ -190,15 +190,16 @@ const normalizeText = (
     return malformed(path, 'wrong_type');
   }
 
-  const normalized = value
+  const canonical = value
     .normalize('NFC')
     .replace(/\r\n?/gu, '\n')
-    .replace(/\t/gu, ' ')
-    .trim();
+    .replace(/\t/gu, ' ');
 
-  if (CONTROL_CHARACTER_PATTERN.test(normalized)) {
+  if (CONTROL_CHARACTER_PATTERN.test(canonical)) {
     return fail('unsafe_content', [detail(path, 'control_character')]);
   }
+
+  const normalized = canonical.trim();
 
   if (EXECUTABLE_TEXT_PATTERN.test(normalized)) {
     return fail('unsafe_content', [detail(path, 'unsafe_value')]);
@@ -291,11 +292,11 @@ const readIdentifier = <K extends IdentifierKind>(
     return fail('invalid_identifier', detailsWithPath(path, result.details));
   }
 
-  if (state.suppliedIdentifiers.has(value)) {
+  if (state.suppliedIdentifiers.has(identifierKey(kind, value))) {
     return fail('duplicate_identifier', [detail(path, 'duplicate_value')]);
   }
 
-  state.suppliedIdentifiers.add(value);
+  state.suppliedIdentifiers.add(identifierKey(kind, value));
   return succeed(value);
 };
 
@@ -385,7 +386,7 @@ const readOptionalContext = (
     'long',
     false,
     state,
-    hasOwn(context, 'summary'),
+    true,
   );
   if (!summaryResult.ok) {
     return summaryResult;
@@ -600,7 +601,7 @@ const readPlanItem = (
     'long',
     false,
     state,
-    hasOwn(item, 'description'),
+    true,
   );
   if (!descriptionResult.ok) {
     return descriptionResult;
@@ -687,7 +688,7 @@ const readTopic = (
     'long',
     false,
     state,
-    hasOwn(topic, 'description'),
+    true,
   );
   if (!descriptionResult.ok) {
     return descriptionResult;
@@ -782,7 +783,7 @@ const readMilestone = (
     'long',
     false,
     state,
-    hasOwn(milestone, 'description'),
+    true,
   );
   if (!descriptionResult.ok) {
     return descriptionResult;
@@ -850,7 +851,7 @@ const readCandidate = (
     'short',
     false,
     state,
-    hasOwn(root, 'title'),
+    true,
   );
   if (!titleResult.ok) {
     return titleResult;
@@ -884,7 +885,7 @@ const readCandidate = (
     'long',
     false,
     state,
-    hasOwn(goal, 'description'),
+    true,
   );
   if (!goalDescriptionResult.ok) {
     return goalDescriptionResult;
@@ -960,11 +961,11 @@ const allocateIdentifier = <K extends IdentifierKind>(
     return fail('invalid_identifier', detailsWithPath(path, branded.details));
   }
 
-  if (usedIdentifiers.has(candidate)) {
+  if (usedIdentifiers.has(identifierKey(kind, candidate))) {
     return fail('duplicate_identifier', [detail(path, 'duplicate_value')]);
   }
 
-  usedIdentifiers.add(candidate);
+  usedIdentifiers.add(identifierKey(kind, candidate));
   return succeed(branded.value);
 };
 

@@ -42,6 +42,11 @@ const detail = (
   extra?: { readonly limit?: number },
 ) => ({ path, code, ...(extra ?? {}) });
 
+const identifierKey = (
+  kind: Parameters<typeof brandIdentifier>[0],
+  value: string,
+): string => `${kind}:${value}`;
+
 const detailsWithPath = (
   path: string,
   entries: readonly DomainErrorDetail[],
@@ -90,7 +95,7 @@ const validateText = (
   }
   if (value.length === 0) {
     return optional
-      ? succeed(undefined)
+      ? fail('malformed_input', [detail(path, 'invalid_syntax')])
       : fail('missing_required', [detail(path, 'empty')]);
   }
   if (CONTROL_CHARACTER_PATTERN.test(value)) {
@@ -98,6 +103,14 @@ const validateText = (
   }
   if (EXECUTABLE_TEXT_PATTERN.test(value)) {
     return fail('unsafe_content', [detail(path, 'unsafe_value')]);
+  }
+  const canonical = value
+    .normalize('NFC')
+    .replace(/\r\n?/gu, '\n')
+    .replace(/\t/gu, ' ')
+    .trim();
+  if (canonical !== value) {
+    return fail('malformed_input', [detail(path, 'invalid_syntax')]);
   }
   if (Array.from(value).length > maxLength) {
     return fail('too_large', [detail(path, 'too_long', { limit: maxLength })]);
@@ -203,6 +216,24 @@ const validateTextWithTotal = (
   return result;
 };
 
+const addCanonicalText = (
+  value: string,
+  path: string,
+  state: ValidationState,
+): DomainResult<string> => {
+  const scalarLength = Array.from(value).length;
+  if (
+    state.canonicalTextLength + scalarLength >
+    DOMAIN_LIMITS.canonicalText.maxLength
+  ) {
+    return fail('too_large', [
+      detail(path, 'limit_exceeded', { limit: DOMAIN_LIMITS.canonicalText.maxLength }),
+    ]);
+  }
+  state.canonicalTextLength += scalarLength;
+  return succeed(value);
+};
+
 const validateResource = (
   value: unknown,
   path: string,
@@ -231,10 +262,10 @@ const validateResource = (
   if (!idResult.ok) {
     return idResult;
   }
-  if (state.identifiers.has(idResult.value)) {
+  if (state.identifiers.has(identifierKey('resource', idResult.value))) {
     return fail('duplicate_identifier', [detail(childPath(path, 'resourceId'), 'duplicate_value')]);
   }
-  state.identifiers.add(idResult.value);
+  state.identifiers.add(identifierKey('resource', idResult.value));
 
   const labelResult = validateTextWithTotal(
     record.label,
@@ -250,6 +281,16 @@ const validateResource = (
   const hrefResult = validateUrl(record.href, childPath(path, 'href'));
   if (!hrefResult.ok) {
     return hrefResult;
+  }
+  if (hrefResult.value !== undefined) {
+    const hrefBudgetResult = addCanonicalText(
+      hrefResult.value,
+      childPath(path, 'href'),
+      state,
+    );
+    if (!hrefBudgetResult.ok) {
+      return hrefBudgetResult;
+    }
   }
   const opaqueResult = validateTextWithTotal(
     record.opaqueReference,
@@ -300,10 +341,10 @@ const validatePlanItem = (
   if (!idResult.ok) {
     return idResult;
   }
-  if (state.identifiers.has(idResult.value)) {
+  if (state.identifiers.has(identifierKey('plan_item', idResult.value))) {
     return fail('duplicate_identifier', [detail(childPath(path, 'itemId'), 'duplicate_value')]);
   }
-  state.identifiers.add(idResult.value);
+  state.identifiers.add(identifierKey('plan_item', idResult.value));
 
   const titleResult = validateTextWithTotal(
     record.title,
@@ -393,10 +434,10 @@ const validateTopic = (
   if (!idResult.ok) {
     return idResult;
   }
-  if (state.identifiers.has(idResult.value)) {
+  if (state.identifiers.has(identifierKey('topic', idResult.value))) {
     return fail('duplicate_identifier', [detail(childPath(path, 'topicId'), 'duplicate_value')]);
   }
-  state.identifiers.add(idResult.value);
+  state.identifiers.add(identifierKey('topic', idResult.value));
 
   const titleResult = validateTextWithTotal(
     record.title,
@@ -494,10 +535,10 @@ const validateMilestone = (
   if (!idResult.ok) {
     return idResult;
   }
-  if (state.identifiers.has(idResult.value)) {
+  if (state.identifiers.has(identifierKey('milestone', idResult.value))) {
     return fail('duplicate_identifier', [detail(childPath(path, 'milestoneId'), 'duplicate_value')]);
   }
-  state.identifiers.add(idResult.value);
+  state.identifiers.add(identifierKey('milestone', idResult.value));
 
   const titleResult = validateTextWithTotal(
     record.title,
@@ -541,8 +582,6 @@ const validateMilestone = (
       }),
     ]);
   }
-  state.topicCount += topicsValue.length;
-
   const topics: Topic[] = [];
   for (const [index, topic] of topicsValue.entries()) {
     const topicResult = validateTopic(topic, indexedPath(path, 'topics', index), state);
@@ -588,10 +627,10 @@ const validateGoal = (
   if (!idResult.ok) {
     return idResult;
   }
-  if (state.identifiers.has(idResult.value)) {
+  if (state.identifiers.has(identifierKey('goal', idResult.value))) {
     return fail('duplicate_identifier', [detail(childPath(path, 'goalId'), 'duplicate_value')]);
   }
-  state.identifiers.add(idResult.value);
+  state.identifiers.add(identifierKey('goal', idResult.value));
 
   const titleResult = validateTextWithTotal(
     record.title,
@@ -636,7 +675,7 @@ export const validatePlanCandidate = (
   const root = rootResult.value;
   const unknown = unknownFieldFailure(
     root,
-    ['title', 'goal', 'context', 'milestones', 'missingOptionalPaths'],
+    ['title', 'goal', 'context', 'milestones'],
     '',
   );
   if (unknown) {
@@ -731,10 +770,10 @@ export const validatePlanCandidate = (
         if (!entryIdResult.ok) {
           return entryIdResult;
         }
-        if (state.identifiers.has(entryIdResult.value)) {
+        if (state.identifiers.has(identifierKey('context_entry', entryIdResult.value))) {
           return fail('duplicate_identifier', [detail(childPath(entryPath, 'entryId'), 'duplicate_value')]);
         }
-        state.identifiers.add(entryIdResult.value);
+        state.identifiers.add(identifierKey('context_entry', entryIdResult.value));
         const labelResult = validateTextWithTotal(
           entryRecord.label,
           childPath(entryPath, 'label'),
@@ -781,17 +820,6 @@ export const validatePlanCandidate = (
       return milestoneResult;
     }
     milestones.push(milestoneResult.value);
-  }
-
-  if (root.missingOptionalPaths !== undefined) {
-    if (!Array.isArray(root.missingOptionalPaths)) {
-      return invalidType('missingOptionalPaths');
-    }
-    for (const [index, path] of root.missingOptionalPaths.entries()) {
-      if (typeof path !== 'string') {
-        return invalidType(`missingOptionalPaths[${index}]`);
-      }
-    }
   }
 
   return succeed(candidate as CanonicalPlanContent);

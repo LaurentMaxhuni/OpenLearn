@@ -46,14 +46,14 @@
 
 **Steps**
 
-- [ ] Add a private root workspace named openlearn with package manager pnpm 10.15.0, Node 24 engine bounds, and scripts for build, typecheck, test, and verify.
-- [ ] Configure the workspace packages globs as apps/* and packages/*.
-- [ ] Configure strict TypeScript with NodeNext module resolution, ES2024 target, noUncheckedIndexedAccess, exactOptionalPropertyTypes, noImplicitOverride, noFallthroughCasesInSwitch, forceConsistentCasingInFileNames, skipLibCheck, declaration, and verbatimModuleSyntax.
-- [ ] Configure the domain package as an ESM package named @openlearn/domain with build output in dist and scripts that build before running node:test against dist/test.
-- [ ] Keep the initial public entry point empty except for a harmless module boundary so the package can be typechecked before domain modules exist.
-- [ ] Install dependencies with the repository's selected pnpm version, producing a lockfile only if the install succeeds and does not overwrite unrelated lockfile work.
-- [ ] Run pnpm run typecheck, pnpm run test, and pnpm run build. Expected result: all three commands succeed with the empty package boundary.
-- [ ] Commit the harness as build: add domain package workspace.
+- [x] Add a private root workspace named openlearn with package manager pnpm 10.15.0, Node 24 engine bounds, and scripts for build, typecheck, test, and verify.
+- [x] Configure the workspace packages globs as apps/* and packages/*.
+- [x] Configure strict TypeScript with NodeNext module resolution, ES2024 target, noUncheckedIndexedAccess, exactOptionalPropertyTypes, noImplicitOverride, noFallthroughCasesInSwitch, forceConsistentCasingInFileNames, skipLibCheck, declaration, and verbatimModuleSyntax.
+- [x] Configure the domain package as an ESM package named @openlearn/domain with build output in dist and scripts that build before running node:test against dist/test.
+- [x] Keep the initial public entry point empty except for a harmless module boundary so the package can be typechecked before domain modules exist.
+- [x] Install dependencies with the repository's selected pnpm version, producing a lockfile only if the install succeeds and does not overwrite unrelated lockfile work.
+- [x] Run pnpm run typecheck, pnpm run test, and pnpm run build. Expected result: all three commands succeed with the empty package boundary.
+- [x] Commit the harness as build: add domain package workspace.
 
 ## Task 2: Define domain primitives, aggregate types, limits, and errors
 
@@ -68,28 +68,28 @@
 
 **Types and interfaces**
 
-- [ ] Define branded PlanId, RevisionId, GoalId, ContextEntryId, MilestoneId, TopicId, PlanItemId, ResourceId, and InternalOwnerId types. Use a single opaque brand pattern that cannot be satisfied accidentally by an arbitrary string in typed code.
-- [ ] Define Goal with stable id, title, and optional description. The accepted plan contains exactly one Goal; the domain does not add a primary-marker field.
-- [ ] Define ContextEntry with stable entryId, label, and normalized value. Define optional Context with an optional summary and an ordered readonly collection of entries.
-- [ ] Define Resource with stable id, required label, optional safe URL, and optional bounded opaqueReference. A label-only resource is valid.
-- [ ] Define PlanItem with stable id, title, optional description, and ordered resources.
-- [ ] Define Topic and Milestone as ordered containers with stable IDs, required titles, optional descriptions, and required non-empty child arrays.
-- [ ] Define CanonicalPlanContent as a normalized immutable snapshot with optional title, exactly one Goal, optional context, milestones, and no actor-controlled lifecycle or progress fields.
-- [ ] Define PlanLifecycle as active or deleted, ProgressState as not_started, in_progress, or completed_by_learner, and a progress record containing state, progressVersion, lastNonCompleteState when needed, and lastConfirmedAt.
-- [ ] Define AcceptedRevisionRef and PlanAggregate with ownerId, planId, lifecycle, current accepted revision or no current revision after deletion, and progress records.
-- [ ] Define a deletion tombstone containing plan identity, owner identity, deletion time, and the terminal revision reference needed to prevent resurrection without exposing content.
-- [ ] Define DomainErrorCategory with malformed_input, missing_required, invalid_identifier, duplicate_identifier, invalid_relationship, unsafe_content, too_large, unknown_field, stale_revision, stale_progress, invalid_transition, deletion_conflict, owner_unavailable, plan_deleted, and mutation_replay_conflict.
-- [ ] Define a discriminated DomainResult<T> success or failure union. Failure values must carry a stable category and safe human-independent details; they must not contain raw submitted content, credentials, provider claims, or cross-owner resource existence.
-- [ ] Define IdentifierKind and IdentityAllocator with allocate(kind) returning an opaque string. Keep allocation outside validation's authority boundary so callers can provide deterministic fixture allocators.
+- [x] Define branded PlanId, RevisionId, GoalId, ContextEntryId, MilestoneId, TopicId, PlanItemId, ResourceId, and InternalOwnerId types. Use a single opaque brand pattern that cannot be satisfied accidentally by an arbitrary string in typed code.
+- [x] Define Goal with stable id, title, and optional description. The accepted plan contains exactly one Goal; the domain does not add a primary-marker field.
+- [x] Define ContextEntry with stable entryId, label, and normalized value. Define optional Context with an optional summary and an ordered readonly collection of entries.
+- [x] Define Resource with stable id, required label, optional safe URL, and optional bounded opaqueReference. A label-only resource is valid.
+- [x] Define PlanItem with stable id, title, optional description, and ordered resources.
+- [x] Define Topic and Milestone as ordered containers with stable IDs, required titles, optional descriptions, and required non-empty child arrays.
+- [x] Define CanonicalPlanContent as a normalized immutable snapshot with optional title, exactly one Goal, optional context, milestones, and no actor-controlled lifecycle or progress fields.
+- [x] Define PlanLifecycle as active or deleted, ProgressState as not_started, in_progress, or completed_by_learner, and a progress record containing state, progressVersion, lastNonCompleteState when needed, and lastConfirmedAt.
+- [x] Define AcceptedRevisionRef and PlanAggregate with ownerId, planId, lifecycle, current accepted revision or no current revision after deletion, and progress records.
+- [x] Define a deletion tombstone containing plan identity, owner identity, deletion time, and the terminal revision reference needed to prevent resurrection without exposing content.
+- [x] Define DomainErrorCategory with malformed_input, missing_required, invalid_identifier, duplicate_identifier, invalid_relationship, unsafe_content, too_large, unknown_field, stale_revision, stale_progress, invalid_transition, deletion_conflict, owner_unavailable, plan_deleted, and mutation_replay_conflict.
+- [x] Define a discriminated DomainResult<T> success or failure union. Failure values must carry a stable category and safe human-independent details; they must not contain raw submitted content, credentials, provider claims, or cross-owner resource existence.
+- [x] Define IdentifierKind and IdentityAllocator with allocate(kind) returning an opaque string. Keep allocation outside validation's authority boundary so callers can provide deterministic fixture allocators.
 
 **Tests first**
 
-- [ ] Add a passing test for branding valid opaque identifiers without changing their case.
-- [ ] Add a failing test for empty identifiers, whitespace-padded identifiers, control characters, and overlong identifiers. Add a passing test that a readable slug-like identifier is accepted as opaque, remains exact and case-sensitive, and is never generated by the domain from presentation text.
-- [ ] Add tests that required type fields are present and readonly collections preserve their declared order.
-- [ ] Add tests for every error category's discriminant and safe detail shape.
-- [ ] Run the focused test before implementation and record the expected failure; implement the types and helpers; rerun the focused test, pnpm run typecheck, and pnpm run test.
-- [ ] Commit as feat: define learning plan domain primitives.
+- [x] Add a passing test for branding valid opaque identifiers without changing their case.
+- [x] Add a failing test for empty identifiers, whitespace-padded identifiers, control characters, and overlong identifiers. Add a passing test that a readable slug-like identifier is accepted as opaque, remains exact and case-sensitive, and is never generated by the domain from presentation text.
+- [x] Add tests that required type fields are present and readonly collections preserve their declared order.
+- [x] Add tests for every error category's discriminant and safe detail shape.
+- [x] Run the focused test before implementation and record the expected failure; implement the types and helpers; rerun the focused test, pnpm run typecheck, and pnpm run test.
+- [x] Commit as feat: define learning plan domain primitives.
 
 ## Task 3: Normalize and validate plan candidates atomically
 
@@ -103,31 +103,31 @@
 
 **Public behavior**
 
-- [ ] Define NormalizedPlanContent with the canonical content and deterministic missingOptionalPaths metadata for omitted optional descriptive content.
-- [ ] Implement normalizePlanContent(input: unknown, allocator: IdentityAllocator): DomainResult<NormalizedPlanContent>. It must be pure, bounded, synchronous, and free of persistence, network, and UI behavior.
-- [ ] Accept plan-shaped unknown input only. Allocate missing stable IDs for accepted entities through the supplied allocator; preserve supplied IDs after validating them.
-- [ ] Apply NFC normalization, line-ending normalization, tab normalization, and edge trimming to all textual values. Preserve internal whitespace and intentional line breaks.
-- [ ] Reject NUL and all disallowed C0 controls, unsafe URL schemes, credentials in URLs, malformed absolute URLs, and URL values over 2048 characters. Do not fetch or dereference URLs.
-- [ ] Enforce ShortText 1 to 240 characters, LongText 1 to 4000 characters, BoundedOpaqueText 1 to 512 characters, identifier length 1 to 128 characters, no more than 50 context entries, 1 to 50 milestones, 200 total topics, 1000 total plan items, 20 resources per item, and 200000 total normalized text characters.
-- [ ] Treat omitted optional descriptive values as absent and record their paths in missingOptionalPaths. Treat optional values that normalize to empty as absent. Reject empty required values.
-- [ ] Require one non-empty Goal with a non-empty title, one to fifty milestones, at least one topic per milestone, and at least one plan item per topic. Allow the plan title, context, descriptions, resources, and resource destinations to be absent.
-- [ ] Preserve all sibling array order exactly. Do not sort or deduplicate by title.
-- [ ] Reject unknown fields at every level and reject candidate attempts to set ownerId, lifecycle, planId, revisionId, progress, operation state, deletion state, timestamps, or other accepted-state fields.
-- [ ] Reject duplicate IDs across the relevant entity namespace and reject invalid parent-child references. A duplicate or relationship error rejects the entire candidate.
-- [ ] Accept a resource with a label only, a safe URL only, or a bounded opaqueReference only when it has a meaningful displayable or referenceable value. Keep opaqueReference non-navigational.
-- [ ] Return a stable category and path-oriented safe detail for malformed, missing-required, invalid-identifier, duplicate-identifier, invalid-relationship, unsafe-content, too-large, and unknown-field failures. Do not return a partially normalized candidate.
+- [x] Define NormalizedPlanContent with the canonical content and deterministic missingOptionalPaths metadata for omitted optional descriptive content.
+- [x] Implement normalizePlanContent(input: unknown, allocator: IdentityAllocator): DomainResult<NormalizedPlanContent>. It must be pure, bounded, synchronous, and free of persistence, network, and UI behavior.
+- [x] Accept plan-shaped unknown input only. Allocate missing stable IDs for accepted entities through the supplied allocator; preserve supplied IDs after validating them.
+- [x] Apply NFC normalization, line-ending normalization, tab normalization, and edge trimming to all textual values. Preserve internal whitespace and intentional line breaks.
+- [x] Reject NUL and all disallowed C0 controls, unsafe URL schemes, credentials in URLs, malformed absolute URLs, and URL values over 2048 characters. Do not fetch or dereference URLs.
+- [x] Enforce ShortText 1 to 240 characters, LongText 1 to 4000 characters, BoundedOpaqueText 1 to 512 characters, identifier length 1 to 128 characters, no more than 50 context entries, 1 to 50 milestones, 200 total topics, 1000 total plan items, 20 resources per item, and 200000 total normalized text characters.
+- [x] Treat omitted optional descriptive values as absent and record their paths in missingOptionalPaths. Treat optional values that normalize to empty as absent. Reject empty required values.
+- [x] Require one non-empty Goal with a non-empty title, one to fifty milestones, at least one topic per milestone, and at least one plan item per topic. Allow the plan title, context, descriptions, resources, and resource destinations to be absent.
+- [x] Preserve all sibling array order exactly. Do not sort or deduplicate by title.
+- [x] Reject unknown fields at every level and reject candidate attempts to set ownerId, lifecycle, planId, revisionId, progress, operation state, deletion state, timestamps, or other accepted-state fields.
+- [x] Reject duplicate IDs across the relevant entity namespace and reject invalid parent-child references. A duplicate or relationship error rejects the entire candidate.
+- [x] Accept a resource with a label only, a safe URL only, or a bounded opaqueReference only when it has a meaningful displayable or referenceable value. Keep opaqueReference non-navigational.
+- [x] Return a stable category and path-oriented safe detail for malformed, missing-required, invalid-identifier, duplicate-identifier, invalid-relationship, unsafe-content, too-large, and unknown-field failures. Do not return a partially normalized candidate.
 
 **Tests first**
 
-- [ ] Test NFC, CRLF and CR conversion, tab conversion, edge trimming, internal whitespace preservation, and line-break preservation.
-- [ ] Test optional empty omission versus required empty rejection and verify missingOptionalPaths ordering is deterministic.
-- [ ] Test supplied IDs remain opaque and exact; allocated IDs are stable under a deterministic allocator; candidate array order remains unchanged.
-- [ ] Test label-only and opaque-reference resources, safe HTTPS URLs, and rejection of non-HTTPS, credential-bearing, control-containing, malformed, and overlong URLs.
-- [ ] Test each structural requirement and each configured count or text bound at the exact boundary and one past the boundary.
-- [ ] Test unknown fields and every forbidden accepted-state field at the root and nested levels.
-- [ ] Test duplicate identifiers, invalid relationships, unsafe control content, malformed non-object values, and atomic rejection.
-- [ ] Run the focused tests before implementation and record the expected failures; implement normalization and validation; run pnpm run typecheck and pnpm run test.
-- [ ] Commit as feat: validate canonical plan content.
+- [x] Test NFC, CRLF and CR conversion, tab conversion, edge trimming, internal whitespace preservation, and line-break preservation.
+- [x] Test optional empty omission versus required empty rejection and verify missingOptionalPaths ordering is deterministic.
+- [x] Test supplied IDs remain opaque and exact; allocated IDs are stable under a deterministic allocator; candidate array order remains unchanged.
+- [x] Test label-only and opaque-reference resources, safe HTTPS URLs, and rejection of non-HTTPS, credential-bearing, control-containing, malformed, and overlong URLs.
+- [x] Test each structural requirement and each configured count or text bound at the exact boundary and one past the boundary.
+- [x] Test unknown fields and every forbidden accepted-state field at the root and nested levels.
+- [x] Test duplicate identifiers, invalid relationships, unsafe control content, malformed non-object values, and atomic rejection.
+- [x] Run the focused tests before implementation and record the expected failures; implement normalization and validation; run pnpm run typecheck and pnpm run test.
+- [x] Commit as feat: validate canonical plan content.
 
 ## Task 4: Model active plans, accepted revisions, replacement, and revision concurrency
 
@@ -141,29 +141,29 @@
 
 **Commands and functions**
 
-- [ ] Define CreatePlanCommand with ownerId, candidate content, allocator, and acceptedAt.
-- [ ] Define ReplacePlanCommand with the existing plan, ownerId, expectedRevisionId, candidate content, allocator, and acceptedAt.
-- [ ] Implement createPlan(command): DomainResult<PlanAggregate>.
-- [ ] Implement replacePlan(command): DomainResult<PlanAggregate>.
+- [x] Define CreatePlanCommand with ownerId, candidate content, allocator, and acceptedAt.
+- [x] Define ReplacePlanCommand with the existing plan, ownerId, expectedRevisionId, candidate content, allocator, and acceptedAt.
+- [x] Implement createPlan(command): DomainResult<PlanAggregate>.
+- [x] Implement replacePlan(command): DomainResult<PlanAggregate>.
 
 **Rules**
 
-- [ ] On successful creation, allocate a PlanId and RevisionId, create lifecycle active, set revision number to 1, store the complete normalized snapshot as the current accepted revision, and create no confirmed progress records.
-- [ ] If the first candidate fails validation, return failure with no aggregate and no accepted plan.
-- [ ] On replacement, require the owner and active lifecycle, require expectedRevisionId to equal the current accepted revision, validate and normalize the complete replacement before constructing the result, and increment the revision number only after successful acceptance.
-- [ ] Treat replacement as full snapshot replacement. Preserve the PlanId and logical progress for stable item IDs; assign not_started version 0 to newly introduced item IDs; do not infer identity from matching titles or positions.
-- [ ] Keep historical progress records for omitted items without including omitted items in the current accepted snapshot or current dashboard summary. If a stable item ID returns in a later revision, its prior confirmed progress is available again.
-- [ ] On validation failure, stale revision, owner failure, deleted-plan access, or any other rejected replacement, return failure and leave the prior accepted aggregate unchanged.
-- [ ] Do not expose a pending candidate as accepted state. Candidate operation status belongs to a later application operation model.
+- [x] On successful creation, allocate a PlanId and RevisionId, create lifecycle active, set revision number to 1, store the complete normalized snapshot as the current accepted revision, and create no confirmed progress records.
+- [x] If the first candidate fails validation, return failure with no aggregate and no accepted plan.
+- [x] On replacement, require the owner and active lifecycle, require expectedRevisionId to equal the current accepted revision, validate and normalize the complete replacement before constructing the result, and increment the revision number only after successful acceptance.
+- [x] Treat replacement as full snapshot replacement. Preserve the PlanId and logical progress for stable item IDs; assign not_started version 0 to newly introduced item IDs; do not infer identity from matching titles or positions.
+- [x] Keep historical progress records for omitted items without including omitted items in the current accepted snapshot or current dashboard summary. If a stable item ID returns in a later revision, its prior confirmed progress is available again.
+- [x] On validation failure, stale revision, owner failure, deleted-plan access, or any other rejected replacement, return failure and leave the prior accepted aggregate unchanged.
+- [x] Do not expose a pending candidate as accepted state. Candidate operation status belongs to a later application operation model.
 
 **Tests first**
 
-- [ ] Test creation and replacement produce stable plan identity, monotonically increasing revision numbers, opaque revision IDs, and exact canonical order.
-- [ ] Test full snapshot replacement with stable, new, omitted, and returning item IDs and verify progress preservation semantics.
-- [ ] Test stale expectedRevisionId, absent expectedRevisionId, invalid owner, deleted lifecycle, and invalid candidate behavior. Assert the original aggregate is structurally unchanged after each failure.
-- [ ] Test a failed candidate never creates a current revision and cannot partially replace nested content.
-- [ ] Run focused tests before implementation, then pnpm run typecheck and pnpm run test.
-- [ ] Commit as feat: model accepted plan revisions.
+- [x] Test creation and replacement produce stable plan identity, monotonically increasing revision numbers, opaque revision IDs, and exact canonical order.
+- [x] Test full snapshot replacement with stable, new, omitted, and returning item IDs and verify progress preservation semantics.
+- [x] Test stale expectedRevisionId, absent expectedRevisionId, invalid owner, deleted lifecycle, and invalid candidate behavior. Assert the original aggregate is structurally unchanged after each failure.
+- [x] Test a failed candidate never creates a current revision and cannot partially replace nested content.
+- [x] Run focused tests before implementation, then pnpm run typecheck and pnpm run test.
+- [x] Commit as feat: model accepted plan revisions.
 
 ## Task 5: Enforce learner-confirmed progress transitions and concurrency
 
@@ -175,30 +175,30 @@
 
 **Commands and functions**
 
-- [ ] Define LearnerAction as start_item, complete_item, or undo_completion.
-- [ ] Define ProgressCommand with plan, ownerId, expectedRevisionId, itemId, expectedProgressVersion, action, and confirmedAt.
-- [ ] Implement effectiveProgress(plan, itemId): LearnerProgressRecord, returning not_started and version 0 when no confirmed record exists.
-- [ ] Implement applyProgressAction(command): DomainResult<PlanAggregate>.
+- [x] Define LearnerAction as start_item, complete_item, or undo_completion.
+- [x] Define ProgressCommand with plan, ownerId, expectedRevisionId, itemId, expectedProgressVersion, action, and confirmedAt.
+- [x] Implement effectiveProgress(plan, itemId): LearnerProgressRecord, returning not_started and version 0 when no confirmed record exists.
+- [x] Implement applyProgressAction(command): DomainResult<PlanAggregate>.
 
 **Rules**
 
-- [ ] Permit start_item only from not_started to in_progress.
-- [ ] Permit complete_item from not_started or in_progress to completed_by_learner.
-- [ ] Permit undo_completion only from completed_by_learner, returning to lastNonCompleteState when it is in_progress or to not_started by default.
-- [ ] Increment progressVersion on every accepted transition and set lastConfirmedAt to the command timestamp. Preserve lastNonCompleteState needed for undo.
-- [ ] Require the current active revision and exact owner. Require expectedRevisionId to match the current accepted revision and expectedProgressVersion to match the current item record.
-- [ ] Reject stale progress and stale revisions without changing the plan. Reject invalid transitions without changing the plan.
-- [ ] Keep confirmed progress separate from operation state. No pending, unvalidated, externally supplied, or failed action can alter the confirmed record.
-- [ ] Reject actions for unknown or omitted current item IDs, deleted plans, unavailable owners, and malformed timestamps. Timestamps record confirmation time and do not replace canonical array order or introduce an unstated event-ordering rule.
+- [x] Permit start_item only from not_started to in_progress.
+- [x] Permit complete_item from not_started or in_progress to completed_by_learner.
+- [x] Permit undo_completion only from completed_by_learner, returning to lastNonCompleteState when it is in_progress or to not_started by default.
+- [x] Increment progressVersion on every accepted transition and set lastConfirmedAt to the command timestamp. Preserve lastNonCompleteState needed for undo.
+- [x] Require the current active revision and exact owner. Require expectedRevisionId to match the current accepted revision and expectedProgressVersion to match the current item record.
+- [x] Reject stale progress and stale revisions without changing the plan. Reject invalid transitions without changing the plan.
+- [x] Keep confirmed progress separate from operation state. No pending, unvalidated, externally supplied, or failed action can alter the confirmed record.
+- [x] Reject actions for unknown or omitted current item IDs, deleted plans, unavailable owners, and malformed timestamps. Timestamps record confirmation time and do not replace canonical array order or introduce an unstated event-ordering rule.
 
 **Tests first**
 
-- [ ] Test the exact transition matrix, including the undo path from completed_by_learner to in_progress and to not_started.
-- [ ] Test version and timestamp updates, absence-as-not_started behavior, and preservation of lastNonCompleteState.
-- [ ] Test stale revision, stale progress version, invalid transition, unknown item, omitted item, deleted plan, and wrong-owner failures leave confirmed state unchanged.
-- [ ] Test a simulated pending or retryable application outcome does not alter the domain aggregate.
-- [ ] Run focused tests before implementation, then pnpm run typecheck and pnpm run test.
-- [ ] Commit as feat: enforce learner progress transitions.
+- [x] Test the exact transition matrix, including the undo path from completed_by_learner to in_progress and to not_started.
+- [x] Test version and timestamp updates, absence-as-not_started behavior, and preservation of lastNonCompleteState.
+- [x] Test stale revision, stale progress version, invalid transition, unknown item, omitted item, deleted plan, and wrong-owner failures leave confirmed state unchanged.
+- [x] Test a simulated pending or retryable application outcome does not alter the domain aggregate.
+- [x] Run focused tests before implementation, then pnpm run typecheck and pnpm run test.
+- [x] Commit as feat: enforce learner progress transitions.
 
 ## Task 6: Enforce owner-scoped deletion, deletion conflicts, and retention deadlines
 
@@ -212,29 +212,29 @@
 
 **Commands and functions**
 
-- [ ] Define DeletePlanCommand with plan, ownerId, expectedRevisionId, deletedAt, and optional deletionOperationId.
-- [ ] Implement deletePlan(command): DomainResult<PlanAggregate>.
-- [ ] Define retention constants and RetentionDeadlines.
-- [ ] Implement retentionDeadlines(requestedAt, accountDeletedAt?) as a pure calculation that represents account lifetime explicitly and does not invent an account-deletion expiry while the account remains active.
+- [x] Define DeletePlanCommand with plan, ownerId, expectedRevisionId, deletedAt, and optional deletionOperationId.
+- [x] Implement deletePlan(command): DomainResult<PlanAggregate>.
+- [x] Define retention constants and RetentionDeadlines.
+- [x] Implement retentionDeadlines(requestedAt, accountDeletedAt?) as a pure calculation that represents account lifetime explicitly and does not invent an account-deletion expiry while the account remains active.
 
 **Rules**
 
-- [ ] Permit only active-to-deleted deletion for the exact owner and current expected revision.
-- [ ] On success, make the plan immediately inaccessible, remove its current readable revision from the aggregate view, retain a minimal tombstone sufficient to reject resurrection, and preserve the terminal revision reference only as needed for safe reconciliation and audit.
-- [ ] Map wrong-owner outcomes to owner_unavailable or another explicitly non-disclosing result. Never reveal whether a plan exists, is active, or was deleted to an unauthorized actor.
-- [ ] Map revision or deletion concurrency failures to deletion_conflict with fresh-read guidance. Do not map deletion conflicts to content-operation retryable failures.
-- [ ] Leave the active aggregate unchanged for failed deletion. Do not permit delayed or retried replacement, progress, or deletion requests to resurrect the deleted PlanId.
-- [ ] Keep idempotency-marker storage and replay reconciliation outside the pure aggregate, while exposing the conflict categories and terminal facts the application layer needs to apply Phase 2 lease and fencing rules.
-- [ ] Encode primary purge within 24 hours of deletion, full operation and replay detail expiry after 24 hours, mutation markers during account lifetime plus 35 days after deletion, redacted telemetry for 30 days, minimal security and ownership audit metadata for 90 days, and backup expiry or scrubbing within 35 days.
-- [ ] Make retention calculations distinguish account deletion from plan deletion and do not claim that domain constants themselves perform a purge.
+- [x] Permit only active-to-deleted deletion for the exact owner and current expected revision.
+- [x] On success, make the plan immediately inaccessible, remove its current readable revision from the aggregate view, retain a minimal tombstone sufficient to reject resurrection, and preserve the terminal revision reference only as needed for safe reconciliation and audit.
+- [x] Map wrong-owner outcomes to owner_unavailable or another explicitly non-disclosing result. Never reveal whether a plan exists, is active, or was deleted to an unauthorized actor.
+- [x] Map revision or deletion concurrency failures to deletion_conflict with fresh-read guidance. Do not map deletion conflicts to content-operation retryable failures.
+- [x] Leave the active aggregate unchanged for failed deletion. Do not permit delayed or retried replacement, progress, or deletion requests to resurrect the deleted PlanId.
+- [x] Keep idempotency-marker storage and replay reconciliation outside the pure aggregate, while exposing the conflict categories and terminal facts the application layer needs to apply Phase 2 lease and fencing rules.
+- [x] Encode primary purge within 24 hours of deletion, full operation and replay detail expiry after 24 hours, mutation markers during account lifetime plus 35 days after deletion, redacted telemetry for 30 days, minimal security and ownership audit metadata for 90 days, and backup expiry or scrubbing within 35 days.
+- [x] Make retention calculations distinguish account deletion from plan deletion and do not claim that domain constants themselves perform a purge.
 
 **Tests first**
 
-- [ ] Test successful deletion, immediate read unavailability, tombstone behavior, repeated deletion behavior, and no-resurrection behavior.
-- [ ] Test wrong owner as non-disclosing, stale expected revision as deletion_conflict, deleted-plan operations, and unchanged aggregate after every failed deletion.
-- [ ] Test retention deadlines at exact boundaries and with an account that remains active, including the 24-hour primary-purge deadline and 35-day account-deletion marker and backup deadlines.
-- [ ] Run focused tests before implementation, then pnpm run typecheck and pnpm run test.
-- [ ] Commit as feat: enforce plan deletion and retention rules.
+- [x] Test successful deletion, immediate read unavailability, tombstone behavior, repeated deletion behavior, and no-resurrection behavior.
+- [x] Test wrong owner as non-disclosing, stale expected revision as deletion_conflict, deleted-plan operations, and unchanged aggregate after every failed deletion.
+- [x] Test retention deadlines at exact boundaries and with an account that remains active, including the 24-hour primary-purge deadline and 35-day account-deletion marker and backup deadlines.
+- [x] Run focused tests before implementation, then pnpm run typecheck and pnpm run test.
+- [x] Commit as feat: enforce plan deletion and retention rules.
 
 ## Task 7: Publish deterministic contract fixtures and dashboard snapshots
 
@@ -248,31 +248,31 @@
 
 **Factories and view boundary**
 
-- [ ] Export acceptedCompleteFixture.
-- [ ] Export acceptedPartialFixture.
-- [ ] Export acceptedNoProgressFixture.
-- [ ] Export revisionPreservesProgressFixture.
-- [ ] Export staleRevisionConflictFixture.
-- [ ] Export progressCompletionPendingFixture.
-- [ ] Export progressConflictFixture.
-- [ ] Export deletionConflictFixture.
-- [ ] Export deletedPlanFixture.
-- [ ] Export unauthorizedPlanFixture.
-- [ ] Define AcceptedPlanSnapshot with planId, revisionId, revisionNumber, acceptedAt, the complete accepted CanonicalPlanContent, current-item confirmed progress, and deterministic current progress counts or next-item summary.
-- [ ] Implement readOwnedAcceptedSnapshot(plan, ownerId): DomainResult<AcceptedPlanSnapshot>.
-- [ ] Keep snapshot types framework-neutral and omit JSX, CSS tokens, router URLs, provider payloads, access tokens, raw identity claims, and operation-internal data.
-- [ ] Represent pending, conflict, unavailable, and deletion states as explicit fixture/application outcomes without replacing the last confirmed progress state with operation state.
-- [ ] Make every fixture deterministic: fixed opaque IDs, fixed timestamps, fixed array order, fixed revision/progress versions, and no current-time or random-value calls.
+- [x] Export acceptedCompleteFixture.
+- [x] Export acceptedPartialFixture.
+- [x] Export acceptedNoProgressFixture.
+- [x] Export revisionPreservesProgressFixture.
+- [x] Export staleRevisionConflictFixture.
+- [x] Export progressCompletionPendingFixture.
+- [x] Export progressConflictFixture.
+- [x] Export deletionConflictFixture.
+- [x] Export deletedPlanFixture.
+- [x] Export unauthorizedPlanFixture.
+- [x] Define AcceptedPlanSnapshot with planId, revisionId, revisionNumber, acceptedAt, the complete accepted CanonicalPlanContent, current-item confirmed progress, and deterministic current progress counts or next-item summary.
+- [x] Implement readOwnedAcceptedSnapshot(plan, ownerId): DomainResult<AcceptedPlanSnapshot>.
+- [x] Keep snapshot types framework-neutral and omit JSX, CSS tokens, router URLs, provider payloads, access tokens, raw identity claims, and operation-internal data.
+- [x] Represent pending, conflict, unavailable, and deletion states as explicit fixture/application outcomes without replacing the last confirmed progress state with operation state.
+- [x] Make every fixture deterministic: fixed opaque IDs, fixed timestamps, fixed array order, fixed revision/progress versions, and no current-time or random-value calls.
 
 **Tests**
 
-- [ ] Assert every named factory returns the documented scenario and can be serialized deterministically.
-- [ ] Assert complete, partial, and no-progress fixtures cover the Phase 3 dashboard handoff fields without choosing a UI framework.
-- [ ] Assert revision-preservation, stale-revision, progress-conflict, deletion-conflict, deleted, and unauthorized fixtures expose the correct safe outcome and last accepted state semantics.
-- [ ] Assert unauthorized snapshots are non-disclosing and do not reveal plan existence or accepted content.
-- [ ] Assert pending progress fixtures retain exact confirmed progress and put operation status in a separate result or action view.
-- [ ] Run focused tests before implementation, then pnpm run typecheck and pnpm run test.
-- [ ] Commit as test: add deterministic domain fixtures.
+- [x] Assert every named factory returns the documented scenario and can be serialized deterministically.
+- [x] Assert complete, partial, and no-progress fixtures cover the Phase 3 dashboard handoff fields without choosing a UI framework.
+- [x] Assert revision-preservation, stale-revision, progress-conflict, deletion-conflict, deleted, and unauthorized fixtures expose the correct safe outcome and last accepted state semantics.
+- [x] Assert unauthorized snapshots are non-disclosing and do not reveal plan existence or accepted content.
+- [x] Assert pending progress fixtures retain exact confirmed progress and put operation status in a separate result or action view.
+- [x] Run focused tests before implementation, then pnpm run typecheck and pnpm run test.
+- [x] Commit as test: add deterministic domain fixtures.
 
 ## Task 8: Close and document the public package boundary
 
@@ -284,14 +284,14 @@
 
 **Steps**
 
-- [ ] Export only the canonical domain types, command interfaces, limits, retention constants, result and error types, normalization and validation functions, plan/revision/progress/deletion transitions, snapshots, and deterministic fixtures required by later phases.
-- [ ] Keep constructors and internal helpers private unless exposing them is necessary for a stable contract test.
-- [ ] Add a public API test that imports from the package entry point, creates or loads a deterministic fixture, reads an owner-scoped snapshot, completes an item, and verifies the resulting confirmed progress.
-- [ ] Add a public API test that proves a raw actor ID cannot substitute for the typed InternalOwnerId without an explicit identity-boundary conversion owned by a later application layer.
-- [ ] Document that packages/domain is pure and framework-neutral; describe accepted candidate, aggregate transition, snapshot, error, and retention boundaries.
-- [ ] Run a forbidden-dependency scan with rg -n against packages/domain for react, vite, fastify, mcp, postgres, orm, oauth, oidc, bearer, and fetch(. Expected result: no runtime source dependency matches; explanatory boundary text in documentation may mention excluded technologies.
-- [ ] Run pnpm run verify and inspect generated declaration files for accidental UI, database, or provider types.
-- [ ] Commit as docs: publish domain package boundary.
+- [x] Export only the canonical domain types, command interfaces, limits, retention constants, result and error types, normalization and validation functions, plan/revision/progress/deletion transitions, snapshots, and deterministic fixtures required by later phases.
+- [x] Keep constructors and internal helpers private unless exposing them is necessary for a stable contract test.
+- [x] Add a public API test that imports from the package entry point, creates or loads a deterministic fixture, reads an owner-scoped snapshot, completes an item, and verifies the resulting confirmed progress.
+- [x] Add a public API test that proves a raw actor ID cannot substitute for the typed InternalOwnerId without an explicit identity-boundary conversion owned by a later application layer.
+- [x] Document that packages/domain is pure and framework-neutral; describe accepted candidate, aggregate transition, snapshot, error, and retention boundaries.
+- [x] Run a forbidden-dependency scan with rg -n against packages/domain for react, vite, fastify, mcp, postgres, orm, oauth, oidc, bearer, and fetch(. Expected result: no runtime source dependency matches; explanatory boundary text in documentation may mention excluded technologies.
+- [x] Run pnpm run verify and inspect generated declaration files for accidental UI, database, or provider types.
+- [x] Commit as docs: publish domain package boundary.
 
 ## Task 9: Verify the specification and update Phase 4 status only after implementation evidence
 

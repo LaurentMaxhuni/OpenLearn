@@ -77,6 +77,10 @@ export interface CanonicalPlanContent {
   readonly milestones: NonEmptyReadonlyArray<Milestone>;
 }
 
+export interface NormalizedPlanContent extends CanonicalPlanContent {
+  readonly missingOptionalPaths: readonly string[];
+}
+
 export type PlanLifecycle = 'active' | 'deleted';
 
 export type ProgressState =
@@ -133,11 +137,13 @@ interface PlanAggregateBase {
 export interface ActivePlanAggregate extends PlanAggregateBase {
   readonly lifecycle: 'active';
   readonly currentRevision: AcceptedRevisionRef;
+  readonly content: NormalizedPlanContent;
 }
 
 export interface DeletedPlanAggregate extends PlanAggregateBase {
   readonly lifecycle: 'deleted';
   readonly currentRevision?: undefined;
+  readonly tombstone: PlanDeletionTombstone;
 }
 
 export type PlanAggregate = ActivePlanAggregate | DeletedPlanAggregate;

@@ -245,6 +245,10 @@ test('defines required fields and preserves declared readonly collection order',
     planId: expectSuccess(planId),
     lifecycle: 'active',
     currentRevision: revision,
+    content: {
+      ...content,
+      missingOptionalPaths: [],
+    },
     progress: [progress],
   };
 

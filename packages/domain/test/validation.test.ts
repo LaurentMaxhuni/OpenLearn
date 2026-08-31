@@ -62,7 +62,9 @@ test('accepts validation of a minimal normalized candidate', () => {
     throw new Error(`expected normalized candidate, received ${normalizedResult.category}`);
   }
 
-  const validated = validatePlanCandidate(normalizedResult.value);
+  const { missingOptionalPaths: _missingOptionalPaths, ...canonical } =
+    normalizedResult.value;
+  const validated = validatePlanCandidate(canonical);
   assert.equal(validated.ok, true);
 });
 
@@ -469,12 +471,22 @@ test('rejects duplicate identifiers and invalid parent-child relationships atomi
         },
         milestones: [
           {
-            milestoneId: 'dup-id',
+            milestoneId: 'dup-milestone-id',
             title: 'Milestone',
             topics: [
               {
                 title: 'Topic',
                 items: [{ title: 'Item' }],
+              },
+            ],
+          },
+          {
+            milestoneId: 'dup-milestone-id',
+            title: 'Another milestone',
+            topics: [
+              {
+                title: 'Another topic',
+                items: [{ title: 'Another item' }],
               },
             ],
           },
@@ -484,7 +496,7 @@ test('rejects duplicate identifiers and invalid parent-child relationships atomi
     ),
     'duplicate_identifier',
   );
-  assert.deepEqual(duplicateDetails, [{ path: 'milestones[0].milestoneId', code: 'duplicate_value' }]);
+  assert.deepEqual(duplicateDetails, [{ path: 'milestones[1].milestoneId', code: 'duplicate_value' }]);
 
   const normalized = normalizePlanContent(
     {
@@ -503,12 +515,15 @@ test('rejects duplicate identifiers and invalid parent-child relationships atomi
     throw new Error(`expected normalized candidate, received ${normalized.category}`);
   }
 
+  const { missingOptionalPaths: _missingOptionalPaths, ...canonical } =
+    normalized.value;
+
   const relationshipDetails = expectFailure(
     validatePlanCandidate({
-      ...normalized.value,
+      ...canonical,
       milestones: [
         {
-          ...normalized.value.milestones[0],
+          ...canonical.milestones[0],
           topics: [],
         },
       ],
@@ -549,4 +564,111 @@ test('rejects control characters in descriptive content and does not return part
 
   assert.deepEqual(details, [{ path: 'goal.description', code: 'control_character' }]);
   assert.deepEqual(allocator.calls, []);
+});
+
+test('validates a plan with 101 topics without double-counting topics', () => {
+  const normalizedResult = normalizePlanContent(
+    {
+      goal: { title: 'Goal' },
+      milestones: [
+        {
+          title: 'Milestone',
+          topics: Array.from({ length: 101 }, (_, index) => ({
+            title: `Topic ${index + 1}`,
+            items: [{ title: `Item ${index + 1}` }],
+          })),
+        },
+      ],
+    },
+    new DeterministicAllocator(),
+  );
+
+  assert.equal(normalizedResult.ok, true);
+  if (!normalizedResult.ok) {
+    throw new Error(`expected normalized candidate, received ${normalizedResult.category}`);
+  }
+
+  const { missingOptionalPaths: _missingOptionalPaths, ...canonical } =
+    normalizedResult.value;
+  const validated = validatePlanCandidate(canonical);
+
+  assert.equal(validated.ok, true);
+});
+
+test('rejects manually constructed non-canonical text during runtime validation', () => {
+  const normalizedResult = normalizePlanContent(
+    createMinimalCandidate(),
+    new DeterministicAllocator(),
+  );
+
+  assert.equal(normalizedResult.ok, true);
+  if (!normalizedResult.ok) {
+    throw new Error(`expected normalized candidate, received ${normalizedResult.category}`);
+  }
+
+  const { missingOptionalPaths: _missingOptionalPaths, ...canonical } =
+    normalizedResult.value;
+
+  const result = validatePlanCandidate({
+    ...canonical,
+    goal: {
+      ...canonical.goal,
+      title: ' Goal\t\r\n',
+    },
+  });
+
+  const details = expectFailure(result, 'malformed_input');
+
+  assert.deepEqual(details, [{ path: 'goal.title', code: 'invalid_syntax' }]);
+});
+
+test('rejects normalization diagnostics supplied as candidate fields', () => {
+  const result = validatePlanCandidate({
+    ...createMinimalCandidate(),
+    missingOptionalPaths: ['x'.repeat(100_000)],
+  });
+
+  const details = expectFailure(result, 'unknown_field');
+
+  assert.deepEqual(details, [
+    { path: 'missingOptionalPaths', code: 'unknown_field' },
+  ]);
+});
+
+test('counts href values toward the aggregate canonical text limit', () => {
+  const hrefPrefix = 'https://example.com/';
+  const href = `${hrefPrefix}${'a'.repeat(
+    DOMAIN_LIMITS.safeHttpsUrl.maxLength - hrefPrefix.length,
+  )}`;
+  const candidate = {
+    goal: { goalId: 'goal-url-budget', title: 'Goal' },
+    milestones: [
+      {
+        milestoneId: 'milestone-url-budget',
+        title: 'Milestone',
+        topics: [
+          {
+            topicId: 'topic-url-budget',
+            title: 'Topic',
+            items: Array.from({ length: 5 }, (_, itemIndex) => ({
+              itemId: `item-url-budget-${itemIndex}`,
+              title: `Item ${itemIndex}`,
+              resources: Array.from({ length: 20 }, (_, resourceIndex) => ({
+                resourceId: `resource-url-budget-${itemIndex}-${resourceIndex}`,
+                label: 'Resource',
+                href,
+              })),
+            })),
+          },
+        ],
+      },
+    ],
+  };
+
+  const result = validatePlanCandidate(candidate);
+  const details = expectFailure(result, 'too_large');
+
+  assert.equal(details[0]?.code, 'limit_exceeded');
+  assert.equal(details[0]?.path?.endsWith('.href'), true);
+  assert.equal(details[0]?.limit, DOMAIN_LIMITS.canonicalText.maxLength);
 });

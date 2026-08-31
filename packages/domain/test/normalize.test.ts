@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   DOMAIN_LIMITS,
   normalizePlanContent,
+  validatePlanCandidate,
   type DomainErrorCategory,
   type DomainResult,
   type IdentifierKind,
@@ -242,6 +243,103 @@ test('treats optional empty values as absent, records deterministic missingOptio
     'context_entry',
     'resource',
   ]);
+});
+
+test('records omitted optional descriptive paths in traversal order', () => {
+  const normalized = expectSuccess(
+    normalizePlanContent(
+      {
+        goal: { title: 'Goal' },
+        milestones: [
+          {
+            title: 'Milestone',
+            topics: [{ title: 'Topic', items: [{ title: 'Item' }] }],
+          },
+        ],
+      },
+      new DeterministicAllocator(),
+    ),
+  );
+
+  assert.deepEqual(normalized.missingOptionalPaths, [
+    'title',
+    'goal.description',
+    'milestones[0].description',
+    'milestones[0].topics[0].description',
+    'milestones[0].topics[0].items[0].description',
+  ]);
+});
+
+test('rejects disallowed controls before edge trimming can hide them', () => {
+  const details = expectFailure(
+    normalizePlanContent(
+      {
+        goal: { title: '\u000BGoal' },
+        milestones: [
+          {
+            title: 'Milestone',
+            topics: [{ title: 'Topic', items: [{ title: 'Item' }] }],
+          },
+        ],
+      },
+      new DeterministicAllocator(),
+    ),
+    'unsafe_content',
+  );
+
+  assert.deepEqual(details, [
+    { path: 'goal.title', code: 'control_character' },
+  ]);
+});
+
+test('allows equal identifier strings in separate entity namespaces', () => {
+  const normalized = expectSuccess(
+    normalizePlanContent(
+      {
+        goal: { goalId: 'shared-id', title: 'Goal' },
+        milestones: [
+          {
+            milestoneId: 'shared-id',
+            title: 'Milestone',
+            topics: [
+              {
+                topicId: 'shared-id',
+                title: 'Topic',
+                items: [
+                  {
+                    itemId: 'shared-id',
+                    title: 'Item',
+                    resources: [
+                      {
+                        resourceId: 'shared-id',
+                        label: 'Resource',
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      new DeterministicAllocator(),
+    ),
+  );
+
+  assert.equal(normalized.goal.goalId, 'shared-id');
+  assert.equal(normalized.milestones[0]?.milestoneId, 'shared-id');
+  assert.equal(normalized.milestones[0]?.topics[0]?.topicId, 'shared-id');
+  assert.equal(
+    normalized.milestones[0]?.topics[0]?.items[0]?.itemId,
+    'shared-id',
+  );
+  assert.equal(
+    normalized.milestones[0]?.topics[0]?.items[0]?.resources?.[0]?.resourceId,
+    'shared-id',
+  );
+
+  const { missingOptionalPaths: _missingOptionalPaths, ...canonical } = normalized;
+  assert.equal(validatePlanCandidate(canonical).ok, true);
 });
 
 test('allocates stable ids without reordering siblings', () => {
