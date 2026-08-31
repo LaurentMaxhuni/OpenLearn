@@ -2,7 +2,7 @@
 
 > An open-source, component-driven dashboard for turning AI-generated learning plans into visual, actionable learning experiences through MCP.
 
-> **Project status:** OpenLearn is in early implementation. The framework-neutral `@openlearn/domain` package and Phase 5 static dashboard are available; authentication, persistence, live AI, and MCP integration remain planned.
+> **Project status:** OpenLearn is in early implementation. The framework-neutral domain package, Phase 5 static dashboard, and tested Phase 6 application/MCP/service boundaries are available locally; production authentication, persistence, live AI, and deployment integration remain planned.
 
 ## What is OpenLearn?
 
@@ -18,7 +18,7 @@ OpenLearn will provide reusable components and a dashboard for plan-shaped conte
 
 ## Current status
 
-The product and architecture boundaries, Phase 3 dashboard UX contract, Phase 4 learning-plan domain package, and Phase 5 static dashboard are recorded. The next phase will connect validated external capabilities through the MCP and AI orchestration boundary.
+The product and architecture boundaries, Phase 3 dashboard UX contract, Phase 4 learning-plan domain package, Phase 5 static dashboard, and the first tested Phase 6 integration boundary are recorded. The next phase increment will add the production adapters and compatibility work needed to connect validated external capabilities through the MCP and AI orchestration boundary.
 
 ## Contributing
 
