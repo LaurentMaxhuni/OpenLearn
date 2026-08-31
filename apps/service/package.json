@@ -1,0 +1,19 @@
+{
+  "name": "@openlearn/service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@openlearn/application": "workspace:*",
+    "@openlearn/mcp": "workspace:*",
+    "fastify": "^5.12.1"
+  }
+}
