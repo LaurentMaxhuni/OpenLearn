@@ -94,6 +94,19 @@ interface PendingPlanContent {
 }
 
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u;
+const URL_CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F]/u;
+
+const hasNonEmptyUrlControl = (value: string): boolean => {
+  if (!URL_CONTROL_CHARACTER_PATTERN.test(value)) {
+    return false;
+  }
+
+  return value
+    .normalize('NFC')
+    .replace(/\r\n?/gu, '\n')
+    .replace(/\t/gu, ' ')
+    .trim().length > 0;
+};
 const EXECUTABLE_TEXT_PATTERN =
   /<\s*\/?\s*(?:script|iframe|object|embed|style|link)\b|\bon[a-z][a-z0-9_-]*\s*=|(?:javascript|vbscript):/iu;
 
@@ -243,6 +256,10 @@ const normalizeUrl = (
   state: ParseState,
   present = value !== undefined,
 ): DomainResult<string | undefined> => {
+  if (typeof value === 'string' && hasNonEmptyUrlControl(value)) {
+    return fail('unsafe_content', [detail(path, 'control_character')]);
+  }
+
   const normalizedResult = normalizeText(value, path, 'url', false, state, present);
 
   if (!normalizedResult.ok || normalizedResult.value === undefined) {

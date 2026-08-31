@@ -107,6 +107,9 @@ test('rejects unsafe, malformed, credential-bearing, overlong, and control-conta
     { href: 'http://example.com', code: 'unsafe_value' },
     { href: 'https://user:pass@example.com/path', code: 'unsafe_value' },
     { href: 'https://example.com/\u0000bad', code: 'control_character' },
+    { href: 'https://example.com/\nbad', code: 'control_character' },
+    { href: 'https://example.com/\rbad', code: 'control_character' },
+    { href: 'https://example.com/\tbad', code: 'control_character' },
     { href: 'https://', code: 'invalid_syntax' },
     { href: `https://example.com/${'a'.repeat(DOMAIN_LIMITS.safeHttpsUrl.maxLength)}`, code: 'too_long' },
   ] as const;
@@ -151,6 +154,76 @@ test('rejects unsafe, malformed, credential-bearing, overlong, and control-conta
       },
     ]);
   }
+});
+
+test('rejects control characters in href during runtime validation', () => {
+  const normalizedResult = normalizePlanContent(
+    {
+      goal: { title: 'Goal' },
+      milestones: [
+        {
+          title: 'Milestone',
+          topics: [
+            {
+              title: 'Topic',
+              items: [
+                {
+                  title: 'Item',
+                  resources: [
+                    {
+                      label: 'Resource',
+                      href: 'https://example.com/safe',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    new DeterministicAllocator(),
+  );
+
+  assert.equal(normalizedResult.ok, true);
+  if (!normalizedResult.ok) {
+    throw new Error(`expected normalized candidate, received ${normalizedResult.category}`);
+  }
+
+  const { missingOptionalPaths: _missingOptionalPaths, ...canonical } =
+    normalizedResult.value;
+  const result = validatePlanCandidate({
+    ...canonical,
+    milestones: [
+      {
+        ...canonical.milestones[0],
+        topics: [
+          {
+            ...canonical.milestones[0]?.topics[0],
+            items: [
+              {
+                ...canonical.milestones[0]?.topics[0]?.items[0],
+                resources: [
+                  {
+                    ...canonical.milestones[0]?.topics[0]?.items[0]?.resources?.[0],
+                    href: 'https://example.com/\nunsafe',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  const details = expectFailure(result, 'unsafe_content');
+  assert.deepEqual(details, [
+    {
+      path: 'milestones[0].topics[0].items[0].resources[0].href',
+      code: 'control_character',
+    },
+  ]);
 });
 
 test('rejects unknown fields and forbidden accepted-state fields at root and nested levels', () => {
