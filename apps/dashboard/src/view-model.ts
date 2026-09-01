@@ -1,4 +1,10 @@
 import type {
+  PersonalizationFeedbackArea,
+  PersonalizationFeedbackValue,
+  PersonalizationProposal,
+  PersonalizationState,
+} from '@openlearn/domain';
+import type {
   ContentState,
   ContextViewModel,
   GoalViewModel,
@@ -12,6 +18,11 @@ import type {
   PlanItemViewModel,
   PlanListViewModel,
   PlanSummaryViewModel,
+  PersonalizationFeedbackAreaView,
+  PersonalizationFeedbackOptionViewModel,
+  PersonalizationFeedbackViewModel,
+  PersonalizationProposalViewModel,
+  PersonalizationViewModel,
   ProgressSummaryViewModel,
   ResourceViewModel,
   TrustViewModel,
@@ -83,6 +94,9 @@ export interface ViewModelOptions {
   readonly operation?: PlanDetailViewModel['operation'];
   readonly recovery?: PlanDetailViewModel['recovery'];
   readonly dataControls?: PlanDataControlsViewModel;
+  readonly personalization?: PersonalizationState;
+  readonly personalizationStatusMessage?: string;
+  readonly personalizationTargetLabel?: string;
 }
 
 export interface ListSnapshotEntry {
@@ -266,6 +280,151 @@ const toContext = (
 export const safePlanHref = (planId: string): string =>
   `/plans/${encodeURIComponent(planId)}`;
 
+const feedbackAreaLabels: Readonly<Record<PersonalizationFeedbackArea, string>> = {
+  difficulty: 'Difficulty',
+  pace: 'Pace',
+  relevance: 'Relevance',
+};
+
+const feedbackValueLabels: Readonly<Record<string, string>> = {
+  too_easy: 'Too easy',
+  about_right: 'About right',
+  too_hard: 'Too hard',
+  too_slow: 'Too slow',
+  too_fast: 'Too fast',
+  relevant: 'Relevant',
+  not_relevant: 'Not relevant',
+};
+
+const feedbackOptionsFor = (
+  area: PersonalizationFeedbackArea,
+): readonly PersonalizationFeedbackOptionViewModel[] =>
+  (area === 'difficulty'
+    ? ['too_easy', 'about_right', 'too_hard']
+    : area === 'pace'
+      ? ['too_slow', 'about_right', 'too_fast']
+      : ['relevant', 'not_relevant']
+  ).map((value) => ({
+    value,
+    label: feedbackValueLabels[value] ?? value,
+  }));
+
+const feedbackValueIsValid = (
+  area: PersonalizationFeedbackArea,
+  value: PersonalizationFeedbackValue,
+): boolean => feedbackOptionsFor(area).some((option) => option.value === value);
+
+const proposalTitle = (proposal: PersonalizationProposal): string => {
+  switch (proposal.parameters.kind) {
+    case 'recommend_existing_next_step':
+      return 'Continue with an existing next step';
+    case 'suggest_pacing_preference':
+      return `Consider a ${proposal.parameters.preference} pace`;
+    case 'request_plan_revision':
+      return 'Ask for a revised plan';
+  }
+};
+
+const proposalStatusLabel = (proposal: PersonalizationProposal): string => {
+  switch (proposal.status) {
+    case 'proposed':
+      return 'Needs your review';
+    case 'accepted':
+      return 'Accepted by you';
+    case 'rejected':
+      return 'Marked not useful';
+    case 'withdrawn':
+      return 'Withdrawn';
+    case 'expired':
+      return 'Expired';
+  }
+};
+
+const basisLabels: Readonly<Record<string, string>> = {
+  confirmed_progress: 'confirmed progress',
+  difficulty_feedback: 'difficulty feedback',
+  pace_feedback: 'pace feedback',
+  relevance_feedback: 'relevance feedback',
+};
+
+const itemLabelById = (
+  snapshot: AcceptedPlanSnapshotInput,
+): ReadonlyMap<string, string> =>
+  new Map(
+    snapshot.content.milestones.flatMap((milestone) =>
+      milestone.topics.flatMap((topic) =>
+        topic.items.map((item) => [item.itemId, item.title] as const),
+      ),
+    ),
+  );
+
+export const toPersonalizationViewModel = (
+  state: PersonalizationState,
+  options: {
+    readonly itemLabels?: ReadonlyMap<string, string>;
+    readonly targetLabel?: string;
+    readonly statusMessage?: string;
+  } = {},
+): PersonalizationViewModel => {
+  const itemLabels = options.itemLabels ?? new Map<string, string>();
+  const feedback = state.feedback
+    .filter((entry) => entry.status !== 'deleted')
+    .map<PersonalizationFeedbackViewModel>((entry) => {
+      const itemLabel = entry.itemId === undefined ? undefined : itemLabels.get(entry.itemId);
+      return {
+        feedbackId: entry.feedbackId,
+        area: entry.area,
+        areaLabel: feedbackAreaLabels[entry.area],
+        value: entry.value,
+        valueLabel: feedbackValueLabels[entry.value] ?? entry.value,
+        status: entry.status === 'corrected' ? 'corrected' : 'active',
+        ...(itemLabel === undefined ? {} : { itemLabel }),
+        correctionOptions: feedbackOptionsFor(entry.area).filter(
+          (option) => option.value !== entry.value && feedbackValueIsValid(entry.area, entry.value),
+        ),
+      };
+    });
+  const proposals = state.proposals.map<PersonalizationProposalViewModel>((proposal) => ({
+    proposalId: proposal.proposalId,
+    kind: proposal.parameters.kind,
+    title: proposalTitle(proposal),
+    explanation: proposal.explanation,
+    basis: proposal.basis.map((basis) => basisLabels[basis] ?? basis),
+    status: proposal.status,
+    statusLabel: proposalStatusLabel(proposal),
+    proposalVersion: proposal.proposalVersion,
+    canDecide:
+      proposal.status === 'proposed' &&
+      (state.consent.state === 'enabled' || state.consent.state === 'paused'),
+    ...(proposal.status === 'accepted' && proposal.parameters.kind !== 'recommend_existing_next_step'
+      ? { handoffLabel: 'Your request is ready for the connected AI client. The accepted plan is unchanged.' }
+      : proposal.status === 'accepted'
+        ? { handoffLabel: 'This existing next step was accepted. The plan and progress are unchanged.' }
+        : {}),
+  }));
+  const feedbackAreas: readonly {
+    readonly area: PersonalizationFeedbackAreaView;
+    readonly label: string;
+    readonly options: readonly PersonalizationFeedbackOptionViewModel[];
+  }[] = (['difficulty', 'pace', 'relevance'] as const).map((area) => ({
+    area,
+    label: feedbackAreaLabels[area],
+    options: feedbackOptionsFor(area),
+  }));
+  return {
+    state: state.consent.state,
+    consentVersion: state.consent.consentVersion,
+    scopeLabel: 'This plan only',
+    explanation:
+      'Suggestions use only confirmed progress and this plan’s bounded feedback. They can point to existing items or prepare a request for the connected AI client; your accepted plan never changes automatically.',
+    ...(options.targetLabel === undefined ? {} : { feedbackTargetLabel: options.targetLabel }),
+    feedbackAreas,
+    feedback,
+    proposals,
+    ...(options.statusMessage === undefined ? {} : { statusMessage: options.statusMessage }),
+  };
+};
+
 export const toPlanDetailViewModel = (
   snapshot: AcceptedPlanSnapshotInput,
   options: ViewModelOptions,
@@ -328,6 +487,16 @@ export const toPlanDetailViewModel = (
   };
   const context = toContext(snapshot.content.context);
   const nextActionViewModel = toNextAction(nextItem);
+  const personalization =
+    options.personalization === undefined
+      ? undefined
+      : toPersonalizationViewModel(options.personalization, {
+          itemLabels: itemLabelById(snapshot),
+          ...(focusedItem === undefined ? {} : { targetLabel: focusedItem.title }),
+          ...(options.personalizationStatusMessage === undefined
+            ? {}
+            : { statusMessage: options.personalizationStatusMessage }),
+        });
 
   return {
     surfaceState: contentState,
@@ -363,6 +532,7 @@ export const toPlanDetailViewModel = (
           },
         }
       : { dataControls: options.dataControls }),
+    ...(personalization === undefined ? {} : { personalization }),
   };
 };
 

@@ -22,6 +22,8 @@ export const IDENTIFIER_KINDS = [
   'plan_item',
   'resource',
   'internal_owner',
+  'feedback',
+  'proposal',
 ] as const;
 
 export type IdentifierKind = (typeof IDENTIFIER_KINDS)[number];
@@ -42,6 +44,8 @@ type IdentifierByKind = {
   plan_item: PlanItemId;
   resource: ResourceId;
   internal_owner: InternalOwnerId;
+  feedback: import('./types.js').FeedbackId;
+  proposal: import('./types.js').ProposalId;
 };
 
 export type IdentifierForKind<K extends IdentifierKind> = IdentifierByKind[K];

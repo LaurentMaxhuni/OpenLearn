@@ -35,10 +35,27 @@ export type {
   ApplicationStatePort,
   Clock,
   OperationIdGenerator,
+  PersonalizationStatePort,
+  PersonalizationWriteResult,
   TelemetrySink,
 } from './ports.js';
 export type { ApplicationTransaction } from './transactions.js';
 export { createApplication } from './use-cases.js';
 export type { OpenLearnApplication } from './use-cases.js';
+export { createPersonalizationApplication } from './personalization.js';
+export type {
+  ChangePersonalizationConsentInput,
+  CorrectLearnerFeedbackInput,
+  DecidePersonalizationProposalInput,
+  DeleteLearnerFeedbackInput,
+  EvaluatePersonalizationInput,
+  GetPersonalizationInput,
+  ListPersonalizationProposalsInput,
+  PersonalizationApplication,
+  PersonalizationApplicationDependencies,
+  PersonalizationMutationInput,
+  PurgePersonalizationInput,
+  RecordLearnerFeedbackInput,
+} from './personalization.js';
 export { createMemoryApplicationState } from './testing/memory-state.js';
 export type { MemoryApplicationState } from './testing/memory-state.js';

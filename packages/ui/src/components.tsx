@@ -16,6 +16,10 @@ import type {
   PlanItemViewModel,
   PlanListViewModel,
   PlanSummaryViewModel,
+  PersonalizationConsentViewState,
+  PersonalizationFeedbackAreaView,
+  PersonalizationProposalViewModel,
+  PersonalizationViewModel,
   ProgressSummaryViewModel,
   RecoveryViewModel,
   ResourceViewModel,
@@ -555,6 +559,264 @@ export const PlanItemDetail = ({ item, onProgressAction }: PlanItemDetailProps) 
   </section>
 );
 
+const personalizationStateLabel = (
+  state: PersonalizationConsentViewState,
+): string => {
+  switch (state) {
+    case 'disabled':
+      return 'Suggestions are off';
+    case 'enabled':
+      return 'Suggestions are on';
+    case 'paused':
+      return 'Suggestions are paused';
+    case 'revoked':
+      return 'Personalization was disabled';
+  }
+};
+
+const proposalKindLabel = (proposal: PersonalizationProposalViewModel): string => {
+  switch (proposal.kind) {
+    case 'recommend_existing_next_step':
+    case 'suggest_pacing_preference':
+    case 'request_plan_revision':
+      return proposal.title;
+  }
+};
+
+export interface PersonalizationPanelProps {
+  readonly model: PersonalizationViewModel;
+  readonly onEnable?: () => void;
+  readonly onPause?: () => void;
+  readonly onResume?: () => void;
+  readonly onDisable?: () => void;
+  readonly onRecordFeedback?: (
+    area: PersonalizationFeedbackAreaView,
+    value: string,
+  ) => void;
+  readonly onCorrectFeedback?: (
+    feedbackId: string,
+    area: PersonalizationFeedbackAreaView,
+    value: string,
+  ) => void;
+  readonly onDeleteFeedback?: (feedbackId: string) => void;
+  readonly onAcceptProposal?: (proposalId: string, proposalVersion: number) => void;
+  readonly onRejectProposal?: (proposalId: string, proposalVersion: number) => void;
+}
+
+export const PersonalizationPanel = ({
+  model,
+  onEnable,
+  onPause,
+  onResume,
+  onDisable,
+  onRecordFeedback,
+  onCorrectFeedback,
+  onDeleteFeedback,
+  onAcceptProposal,
+  onRejectProposal,
+}: PersonalizationPanelProps) => {
+  const firstArea = model.feedbackAreas[0]?.area ?? 'difficulty';
+  const [area, setArea] = useState<PersonalizationFeedbackAreaView>(firstArea);
+  const [value, setValue] = useState('');
+  const [corrections, setCorrections] = useState<Readonly<Record<string, string>>>({});
+  const selectedArea =
+    model.feedbackAreas.find((entry) => entry.area === area) ?? model.feedbackAreas[0];
+
+  useEffect(() => {
+    setValue(selectedArea?.options[0]?.value ?? '');
+  }, [selectedArea?.area]);
+
+  const isEnabled = model.state === 'enabled';
+  const isPaused = model.state === 'paused';
+  const isOff = model.state === 'disabled' || model.state === 'revoked';
+
+  return (
+    <section className="panel personalization-panel" aria-labelledby="personalization-heading">
+      <div className="section-heading compact-heading">
+        <p className="eyebrow">Learner control</p>
+        <h2 id="personalization-heading">Suggestions and feedback</h2>
+      </div>
+      <p className="control-status" role="status" aria-live="polite">
+        {personalizationStateLabel(model.state)} · {model.scopeLabel}
+      </p>
+      <p>{model.explanation}</p>
+
+      {isOff ? (
+        <button className="button button-primary" type="button" onClick={onEnable}>
+          {model.state === 'revoked' ? 'Enable again with new consent' : 'Enable suggestions'}
+        </button>
+      ) : (
+        <div className="personalization-controls">
+          {isPaused ? (
+            <button className="button button-primary" type="button" onClick={onResume}>
+              Resume suggestions
+            </button>
+          ) : (
+            <button className="button button-secondary" type="button" onClick={onPause}>
+              Pause suggestions
+            </button>
+          )}
+          <button className="button button-quiet" type="button" onClick={onDisable}>
+            Disable personalization
+          </button>
+        </div>
+      )}
+
+      {model.statusMessage === undefined ? null : (
+        <p className="live-note" role="status" aria-live="polite">
+          {model.statusMessage}
+        </p>
+      )}
+
+      {isEnabled && onRecordFeedback !== undefined ? (
+        <div className="personalization-feedback-form" aria-labelledby="feedback-heading">
+          <h3 id="feedback-heading">Tell us how this plan feels</h3>
+          {model.feedbackTargetLabel === undefined ? null : (
+            <p className="muted">For {model.feedbackTargetLabel}</p>
+          )}
+          <div className="form-row">
+            <label htmlFor="feedback-area">Area</label>
+            <select
+              id="feedback-area"
+              value={area}
+              onChange={(event) => setArea(event.target.value as PersonalizationFeedbackAreaView)}
+            >
+              {model.feedbackAreas.map((entry) => (
+                <option key={entry.area} value={entry.area}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-row">
+            <label htmlFor="feedback-value">Your feedback</label>
+            <select
+              id="feedback-value"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+            >
+              {(selectedArea?.options ?? []).map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            className="button button-primary"
+            type="button"
+            disabled={value.length === 0}
+            onClick={() => onRecordFeedback(area, value)}
+          >
+            Save bounded feedback
+          </button>
+          <p className="muted">No free-text notes are stored.</p>
+        </div>
+      ) : null}
+
+      {model.feedback.length === 0 ? null : (
+        <div className="personalization-records" aria-labelledby="feedback-records-heading">
+          <h3 id="feedback-records-heading">Your saved feedback</h3>
+          <ul className="personalization-list">
+            {model.feedback.map((feedback) => (
+              <li key={feedback.feedbackId}>
+                <div>
+                  <strong>{feedback.areaLabel}: {feedback.valueLabel}</strong>
+                  {feedback.itemLabel === undefined ? null : <span> · {feedback.itemLabel}</span>}
+                  {feedback.status === 'corrected' ? <span> · superseded</span> : null}
+                </div>
+                {feedback.status === 'active' ? (
+                  <div className="personalization-row-actions">
+                    <label className="visually-hidden" htmlFor={`correct-${feedback.feedbackId}`}>
+                      Correct {feedback.areaLabel} feedback
+                    </label>
+                    <select
+                      id={`correct-${feedback.feedbackId}`}
+                      value={corrections[feedback.feedbackId] ?? ''}
+                      onChange={(event) =>
+                        setCorrections((current) => ({
+                          ...current,
+                          [feedback.feedbackId]: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Correct this feedback</option>
+                      {feedback.correctionOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="button button-quiet"
+                      type="button"
+                      disabled={!corrections[feedback.feedbackId]}
+                      onClick={() => {
+                        const correction = corrections[feedback.feedbackId];
+                        if (correction !== undefined && correction !== '') {
+                          onCorrectFeedback?.(feedback.feedbackId, feedback.area, correction);
+                        }
+                      }}
+                    >
+                      Correct
+                    </button>
+                    <button
+                      className="button button-quiet"
+                      type="button"
+                      onClick={() => onDeleteFeedback?.(feedback.feedbackId)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {model.proposals.length === 0 ? null : (
+        <div className="personalization-proposals" aria-labelledby="proposal-heading">
+          <h3 id="proposal-heading">Suggestions to review</h3>
+          <ul className="personalization-list">
+            {model.proposals.map((proposal) => (
+              <li key={proposal.proposalId}>
+                <div>
+                  <strong>{proposalKindLabel(proposal)}</strong>
+                  <span className="proposal-status"> · {proposal.statusLabel}</span>
+                  <p>{proposal.explanation}</p>
+                  <p className="muted">Why this suggestion: {proposal.basis.join(', ')}.</p>
+                  {proposal.handoffLabel === undefined ? null : (
+                    <p className="live-note" role="status">{proposal.handoffLabel}</p>
+                  )}
+                </div>
+                {proposal.canDecide ? (
+                  <div className="personalization-row-actions">
+                    <button
+                      className="button button-primary"
+                      type="button"
+                      onClick={() => onAcceptProposal?.(proposal.proposalId, proposal.proposalVersion)}
+                    >
+                      Accept suggestion
+                    </button>
+                    <button
+                      className="button button-quiet"
+                      type="button"
+                      onClick={() => onRejectProposal?.(proposal.proposalId, proposal.proposalVersion)}
+                    >
+                      Not useful
+                    </button>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+};
+
 export interface PlanDataControlsProps {
   readonly controls: PlanDataControlsViewModel;
   readonly onConfirmDelete?: () => void;
@@ -816,6 +1078,22 @@ export interface DashboardDetailProps {
   readonly onConfirmDelete?: () => void;
   readonly onRetryDelete?: () => void;
   readonly onRefresh?: () => void;
+  readonly onEnablePersonalization?: () => void;
+  readonly onPausePersonalization?: () => void;
+  readonly onResumePersonalization?: () => void;
+  readonly onDisablePersonalization?: () => void;
+  readonly onRecordFeedback?: (
+    area: PersonalizationFeedbackAreaView,
+    value: string,
+  ) => void;
+  readonly onCorrectFeedback?: (
+    feedbackId: string,
+    area: PersonalizationFeedbackAreaView,
+    value: string,
+  ) => void;
+  readonly onDeleteFeedback?: (feedbackId: string) => void;
+  readonly onAcceptProposal?: (proposalId: string, proposalVersion: number) => void;
+  readonly onRejectProposal?: (proposalId: string, proposalVersion: number) => void;
 }
 
 export const DashboardDetail = ({
@@ -825,6 +1103,15 @@ export const DashboardDetail = ({
   onConfirmDelete,
   onRetryDelete,
   onRefresh,
+  onEnablePersonalization,
+  onPausePersonalization,
+  onResumePersonalization,
+  onDisablePersonalization,
+  onRecordFeedback,
+  onCorrectFeedback,
+  onDeleteFeedback,
+  onAcceptProposal,
+  onRejectProposal,
 }: DashboardDetailProps) => (
   <>
     <TrustStateBanner
@@ -850,6 +1137,20 @@ export const DashboardDetail = ({
         disabled={model.operation !== undefined}
       />
     </div>
+    {model.personalization === undefined ? null : (
+      <PersonalizationPanel
+        model={model.personalization}
+        {...(onEnablePersonalization === undefined ? {} : { onEnable: onEnablePersonalization })}
+        {...(onPausePersonalization === undefined ? {} : { onPause: onPausePersonalization })}
+        {...(onResumePersonalization === undefined ? {} : { onResume: onResumePersonalization })}
+        {...(onDisablePersonalization === undefined ? {} : { onDisable: onDisablePersonalization })}
+        {...(onRecordFeedback === undefined ? {} : { onRecordFeedback })}
+        {...(onCorrectFeedback === undefined ? {} : { onCorrectFeedback })}
+        {...(onDeleteFeedback === undefined ? {} : { onDeleteFeedback })}
+        {...(onAcceptProposal === undefined ? {} : { onAcceptProposal })}
+        {...(onRejectProposal === undefined ? {} : { onRejectProposal })}
+      />
+    )}
     <div className="dashboard-workspace">
       <PlanOutline
         nodes={model.outline}

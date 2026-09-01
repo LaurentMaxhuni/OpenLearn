@@ -19,6 +19,8 @@ export type TopicId = OpaqueString<'TopicId'>;
 export type PlanItemId = OpaqueString<'PlanItemId'>;
 export type ResourceId = OpaqueString<'ResourceId'>;
 export type InternalOwnerId = OpaqueString<'InternalOwnerId'>;
+export type FeedbackId = OpaqueString<'FeedbackId'>;
+export type ProposalId = OpaqueString<'ProposalId'>;
 
 export type PositiveInteger = number;
 export type NonNegativeInteger = number;
@@ -153,4 +155,145 @@ export interface PlanDeletionTombstone {
   readonly ownerId: InternalOwnerId;
   readonly deletedAt: Timestamp;
   readonly terminalRevision: AcceptedRevisionRef;
+}
+
+export type PersonalizationConsentState =
+  | 'disabled'
+  | 'enabled'
+  | 'paused'
+  | 'revoked';
+
+export interface PersonalizationConsent {
+  readonly ownerId: InternalOwnerId;
+  readonly planId: PlanId;
+  readonly state: PersonalizationConsentState;
+  readonly consentVersion: NonNegativeInteger;
+  readonly enabledAt?: Timestamp;
+  readonly updatedAt: Timestamp;
+}
+
+export type PersonalizationFeedbackArea =
+  | 'difficulty'
+  | 'pace'
+  | 'relevance';
+
+export type DifficultyFeedbackValue =
+  | 'too_easy'
+  | 'about_right'
+  | 'too_hard';
+
+export type PaceFeedbackValue =
+  | 'too_slow'
+  | 'about_right'
+  | 'too_fast';
+
+export type RelevanceFeedbackValue = 'relevant' | 'not_relevant';
+
+export type PersonalizationFeedbackValue =
+  | DifficultyFeedbackValue
+  | PaceFeedbackValue
+  | RelevanceFeedbackValue;
+
+export type PersonalizationFeedbackStatus =
+  | 'active'
+  | 'corrected'
+  | 'deleted';
+
+export interface LearnerFeedback {
+  readonly feedbackId: FeedbackId;
+  readonly ownerId: InternalOwnerId;
+  readonly planId: PlanId;
+  readonly itemId?: PlanItemId;
+  readonly area: PersonalizationFeedbackArea;
+  readonly value: PersonalizationFeedbackValue;
+  readonly recordedAt: Timestamp;
+  readonly consentVersion: NonNegativeInteger;
+  readonly status: PersonalizationFeedbackStatus;
+  readonly supersedesFeedbackId?: FeedbackId;
+}
+
+export type PersonalizationProposalKind =
+  | 'recommend_existing_next_step'
+  | 'suggest_pacing_preference'
+  | 'request_plan_revision';
+
+export type PersonalizationProposalBasis =
+  | 'confirmed_progress'
+  | 'difficulty_feedback'
+  | 'pace_feedback'
+  | 'relevance_feedback';
+
+export type PacingPreference = 'slower' | 'steady' | 'faster';
+
+export type PlanRevisionReason = 'difficulty' | 'pace' | 'relevance';
+
+export type PersonalizationProposalParameters =
+  | {
+      readonly kind: 'recommend_existing_next_step';
+      readonly itemId: PlanItemId;
+    }
+  | {
+      readonly kind: 'suggest_pacing_preference';
+      readonly preference: PacingPreference;
+    }
+  | {
+      readonly kind: 'request_plan_revision';
+      readonly reason: PlanRevisionReason;
+      readonly itemId?: PlanItemId;
+    };
+
+export type PersonalizationProposalStatus =
+  | 'proposed'
+  | 'accepted'
+  | 'rejected'
+  | 'withdrawn'
+  | 'expired';
+
+export interface PersonalizationProposal {
+  readonly proposalId: ProposalId;
+  readonly ownerId: InternalOwnerId;
+  readonly planId: PlanId;
+  readonly sourceRevisionId: RevisionId;
+  readonly consentVersion: NonNegativeInteger;
+  readonly parameters: PersonalizationProposalParameters;
+  readonly explanation: LongText;
+  readonly basis: readonly [
+    PersonalizationProposalBasis,
+    ...PersonalizationProposalBasis[],
+  ];
+  readonly createdAt: Timestamp;
+  readonly expiresAt: Timestamp;
+  readonly status: PersonalizationProposalStatus;
+  readonly proposalVersion: PositiveInteger;
+  readonly decidedAt?: Timestamp;
+}
+
+export type PersonalizationHandoffIntent =
+  | {
+      readonly kind: 'pacing';
+      readonly preference: PacingPreference;
+    }
+  | {
+      readonly kind: 'plan_revision';
+      readonly reason: PlanRevisionReason;
+      readonly itemId?: PlanItemId;
+    };
+
+export interface PersonalizationRevisionHandoff {
+  readonly requestId: ProposalId;
+  readonly proposalId: ProposalId;
+  readonly ownerId: InternalOwnerId;
+  readonly planId: PlanId;
+  readonly sourceRevisionId: RevisionId;
+  readonly intent: PersonalizationHandoffIntent;
+  readonly createdAt: Timestamp;
+}
+
+export interface PersonalizationState {
+  readonly ownerId: InternalOwnerId;
+  readonly planId: PlanId;
+  readonly stateVersion: NonNegativeInteger;
+  readonly consent: PersonalizationConsent;
+  readonly feedback: readonly LearnerFeedback[];
+  readonly proposals: readonly PersonalizationProposal[];
 }

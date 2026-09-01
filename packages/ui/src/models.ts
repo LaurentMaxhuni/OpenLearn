@@ -131,6 +131,67 @@ export interface PlanDataControlsViewModel {
   };
 }
 
+export type PersonalizationConsentViewState =
+  | 'disabled'
+  | 'enabled'
+  | 'paused'
+  | 'revoked';
+
+export type PersonalizationFeedbackAreaView =
+  | 'difficulty'
+  | 'pace'
+  | 'relevance';
+
+export interface PersonalizationFeedbackOptionViewModel {
+  readonly value: string;
+  readonly label: string;
+}
+
+export interface PersonalizationFeedbackViewModel {
+  readonly feedbackId: string;
+  readonly area: PersonalizationFeedbackAreaView;
+  readonly areaLabel: string;
+  readonly value: string;
+  readonly valueLabel: string;
+  readonly status: 'active' | 'corrected';
+  readonly itemLabel?: string;
+  readonly correctionOptions: readonly PersonalizationFeedbackOptionViewModel[];
+}
+
+export type PersonalizationProposalKindView =
+  | 'recommend_existing_next_step'
+  | 'suggest_pacing_preference'
+  | 'request_plan_revision';
+
+export interface PersonalizationProposalViewModel {
+  readonly proposalId: string;
+  readonly kind: PersonalizationProposalKindView;
+  readonly title: string;
+  readonly explanation: string;
+  readonly basis: readonly string[];
+  readonly status: 'proposed' | 'accepted' | 'rejected' | 'withdrawn' | 'expired';
+  readonly statusLabel: string;
+  readonly proposalVersion: number;
+  readonly canDecide: boolean;
+  readonly handoffLabel?: string;
+}
+
+export interface PersonalizationViewModel {
+  readonly state: PersonalizationConsentViewState;
+  readonly consentVersion: number;
+  readonly scopeLabel: string;
+  readonly explanation: string;
+  readonly feedbackTargetLabel?: string;
+  readonly feedbackAreas: readonly {
+    readonly area: PersonalizationFeedbackAreaView;
+    readonly label: string;
+    readonly options: readonly PersonalizationFeedbackOptionViewModel[];
+  }[];
+  readonly feedback: readonly PersonalizationFeedbackViewModel[];
+  readonly proposals: readonly PersonalizationProposalViewModel[];
+  readonly statusMessage?: string;
+}
+
 export interface PlanSummaryViewModel {
   readonly planId: string;
   readonly href: string;
@@ -166,4 +227,5 @@ export interface PlanDetailViewModel {
   readonly operation?: OperationStatusViewModel;
   readonly recovery?: RecoveryViewModel;
   readonly dataControls?: PlanDataControlsViewModel;
+  readonly personalization?: PersonalizationViewModel;
 }

@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ActivePlanAggregate } from '@openlearn/domain';
+import {
+  changePersonalizationConsent,
+  correctLearnerFeedback,
+  decidePersonalizationProposal,
+  deleteLearnerFeedback,
+  evaluatePersonalization,
+  recordLearnerFeedback,
+  type ActivePlanAggregate,
+  type PersonalizationFeedbackArea,
+  type IdentityAllocator,
+  type PersonalizationState,
+} from '@openlearn/domain';
 import {
   AppShell,
   DashboardDetail,
@@ -23,6 +34,7 @@ import {
 } from './seed-data.js';
 import { applyDashboardProgressAction } from './progress-actions.js';
 import { createProgressStore, type DashboardStorage } from './progress-store.js';
+import { createPersonalizationStore } from './personalization-store.js';
 import {
   actionStatesForPlan,
   setActionState,
@@ -53,6 +65,16 @@ const contentStateFor = (preview: StaticPreviewState): ContentState => {
   }
 };
 
+const detailSourcePlanIdFor = (
+  planId: string,
+  preview: StaticPreviewState,
+): string =>
+  preview === 'partial'
+    ? 'static-plan-partial'
+    : preview === 'completed' || preview === 'conflict'
+      ? 'static-plan-progress'
+      : planId;
+
 const dataControlsFor = (state: DeletionState): PlanDataControlsViewModel => ({
   deletion: {
     state,
@@ -80,6 +102,20 @@ const browserStorage = (): DashboardStorage | undefined => {
     return undefined;
   }
 };
+
+class DashboardPersonalizationAllocator implements IdentityAllocator {
+  private readonly counters = new Map<string, number>();
+
+  allocate(kind: Parameters<IdentityAllocator['allocate']>[0]): string {
+    const next = (this.counters.get(kind) ?? 0) + 1;
+    this.counters.set(kind, next);
+    const randomId =
+      typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now().toString(36)}-${next.toString(36)}`;
+    return `dashboard-${kind}-${randomId}`;
+  }
+}
 
 const planMap = (
   store: ReturnType<typeof createProgressStore>,
@@ -188,12 +224,23 @@ const DetailPage = ({
   actionStates,
   deletionState,
   progressMessage,
+  personalization,
+  personalizationMessage,
   onNavigate,
   onSelectItem,
   onProgressAction,
   onConfirmDelete,
   onRetryDelete,
   onRefresh,
+  onEnablePersonalization,
+  onPausePersonalization,
+  onResumePersonalization,
+  onDisablePersonalization,
+  onRecordFeedback,
+  onCorrectFeedback,
+  onDeleteFeedback,
+  onAcceptProposal,
+  onRejectProposal,
 }: {
   readonly planId: string;
   readonly preview: StaticPreviewState;
@@ -202,12 +249,27 @@ const DetailPage = ({
   readonly actionStates: Readonly<Record<string, LearnerActionState>>;
   readonly deletionState: DeletionState;
   readonly progressMessage?: string;
+  readonly personalization?: PersonalizationState;
+  readonly personalizationMessage?: string;
   readonly onNavigate: (href: string) => void;
   readonly onSelectItem: (itemId: string) => void;
   readonly onProgressAction: (itemId: string, action: LearnerActionKind) => void;
   readonly onConfirmDelete: () => void;
   readonly onRetryDelete: () => void;
   readonly onRefresh: () => void;
+  readonly onEnablePersonalization: () => void;
+  readonly onPausePersonalization: () => void;
+  readonly onResumePersonalization: () => void;
+  readonly onDisablePersonalization: () => void;
+  readonly onRecordFeedback: (area: PersonalizationFeedbackArea, value: string) => void;
+  readonly onCorrectFeedback: (
+    feedbackId: string,
+    area: PersonalizationFeedbackArea,
+    value: string,
+  ) => void;
+  readonly onDeleteFeedback: (feedbackId: string) => void;
+  readonly onAcceptProposal: (proposalId: string, proposalVersion: number) => void;
+  readonly onRejectProposal: (proposalId: string, proposalVersion: number) => void;
 }) => {
   if (preview === 'loading') {
     return (
@@ -242,7 +304,7 @@ const DetailPage = ({
     );
   }
 
-  const sourcePlanId = preview === 'partial' ? 'static-plan-partial' : preview === 'completed' || preview === 'conflict' ? 'static-plan-progress' : planId;
+  const sourcePlanId = detailSourcePlanIdFor(planId, preview);
   const snapshot = snapshotsById.get(sourcePlanId);
   if (snapshot === undefined) {
     return <UnavailablePage onNavigate={onNavigate} />;
@@ -262,6 +324,10 @@ const DetailPage = ({
       : {}),
     ...(Object.keys(actionStates).length === 0 ? {} : { actionStates }),
     ...(progressMessage === undefined ? {} : { progressMessage }),
+    ...(personalization === undefined ? {} : { personalization }),
+    ...(personalizationMessage === undefined
+      ? {}
+      : { personalizationStatusMessage: personalizationMessage }),
     ...(operation === undefined ? {} : { operation }),
     dataControls: dataControlsFor(deletionState),
   });
@@ -283,6 +349,15 @@ const DetailPage = ({
         onConfirmDelete={onConfirmDelete}
         onRetryDelete={onRetryDelete}
         onRefresh={onRefresh}
+        onEnablePersonalization={onEnablePersonalization}
+        onPausePersonalization={onPausePersonalization}
+        onResumePersonalization={onResumePersonalization}
+        onDisablePersonalization={onDisablePersonalization}
+        onRecordFeedback={onRecordFeedback}
+        onCorrectFeedback={onCorrectFeedback}
+        onDeleteFeedback={onDeleteFeedback}
+        onAcceptProposal={onAcceptProposal}
+        onRejectProposal={onRejectProposal}
       />
     </>
   );
@@ -293,14 +368,35 @@ export const App = () => {
     () => createProgressStore(browserStorage()),
     [],
   );
+  const personalizationStore = useMemo(
+    () => createPersonalizationStore(browserStorage()),
+    [],
+  );
+  const personalizationAllocator = useMemo(
+    () => new DashboardPersonalizationAllocator(),
+    [],
+  );
   const hydratePlans = () => planMap(progressStore);
   const [plans, setPlans] = useState<Map<string, ActivePlanAggregate>>(() => hydratePlans());
+  const hydratePersonalization = (sourcePlans: ReadonlyMap<string, ActivePlanAggregate>) =>
+    new Map(
+      [...sourcePlans.values()].map((plan) => [
+        plan.planId,
+        personalizationStore.hydrate(plan, new Date().toISOString()),
+      ] as const),
+    );
+  const [personalizationByPlan, setPersonalizationByPlan] = useState<
+    Map<string, PersonalizationState>
+  >(() => hydratePersonalization(new Map(STATIC_PLANS.map((plan) => [plan.planId, plan]))));
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const [preview, setPreview] = useState<StaticPreviewState>('accepted');
   const [focusedItemId, setFocusedItemId] = useState<string | undefined>();
   const [actionStatesByPlan, setActionStatesByPlan] = useState<ActionStatesByPlan>({});
   const [deletionState, setDeletionState] = useState<DeletionState>('available');
   const [progressMessages, setProgressMessages] = useState<Readonly<Record<string, string>>>({});
+  const [personalizationMessages, setPersonalizationMessages] = useState<
+    Readonly<Record<string, string>>
+  >({});
 
   const snapshots = useMemo(
     () => [...plans.values()].map((plan) => snapshotOfPlan(plan, STATIC_OWNER)),
@@ -328,6 +424,12 @@ export const App = () => {
   const route = routeForPath(pathname);
   const selectedPlanId = route.kind === 'plan' ? route.planId : undefined;
   const selectedPlan = selectedPlanId === undefined ? undefined : plans.get(selectedPlanId);
+  const displayedPlanId =
+    selectedPlanId === undefined
+      ? undefined
+      : detailSourcePlanIdFor(selectedPlanId, preview);
+  const selectedPersonalization =
+    displayedPlanId === undefined ? undefined : personalizationByPlan.get(displayedPlanId);
 
   const selectItem = (itemId: string) => {
     setFocusedItemId(itemId);
@@ -398,6 +500,279 @@ export const App = () => {
       ...messages,
       [selectedPlanId]: result.message,
     }));
+    const currentPersonalization =
+      selectedPlanId === displayedPlanId && selectedPlanId !== undefined
+        ? personalizationByPlan.get(selectedPlanId)
+        : undefined;
+    if (currentPersonalization?.consent.state === 'enabled') {
+      const evaluated = evaluateFor(result.plan, currentPersonalization);
+      if (!evaluated.ok) {
+        setPersonalizationMessages((messages) => ({
+          ...messages,
+          [selectedPlanId]:
+            'Confirmed progress was saved, but suggestions could not be refreshed.',
+        }));
+      } else if (evaluated.value.state.stateVersion !== currentPersonalization.stateVersion) {
+        persistPersonalization(
+          selectedPlanId,
+          evaluated.value.state,
+          currentPersonalization.stateVersion,
+          'Confirmed progress updated. Suggestions were refreshed.',
+        );
+      } else {
+        setPersonalizationMessages((messages) => ({
+          ...messages,
+          [selectedPlanId]: 'Confirmed progress updated. Suggestions were checked.',
+        }));
+      }
+    }
+  };
+
+  const personalizationForSelectedPlan = (): {
+    readonly plan: ActivePlanAggregate;
+    readonly state: PersonalizationState;
+  } | undefined => {
+    if (displayedPlanId === undefined) {
+      return undefined;
+    }
+    const plan = plans.get(displayedPlanId);
+    const state = personalizationByPlan.get(displayedPlanId);
+    return plan === undefined || state === undefined ? undefined : { plan, state };
+  };
+
+  const persistPersonalization = (
+    planId: string,
+    nextState: PersonalizationState,
+    expectedStateVersion: number,
+    successMessage: string,
+  ): boolean => {
+    const result = personalizationStore.save(nextState, expectedStateVersion);
+    if (!result.ok) {
+      setPersonalizationMessages((messages) => ({
+        ...messages,
+        [planId]:
+          result.kind === 'conflict'
+            ? 'Personalization changed in another session. Refresh before trying again.'
+            : 'Personalization is unavailable. Your accepted plan is unchanged.',
+      }));
+      return false;
+    }
+    setPersonalizationByPlan((states) =>
+      new Map(states).set(planId, nextState),
+    );
+    setPersonalizationMessages((messages) => ({
+      ...messages,
+      [planId]: successMessage,
+    }));
+    return true;
+  };
+
+  const evaluateFor = (
+    plan: ActivePlanAggregate,
+    state: PersonalizationState,
+  ) =>
+    evaluatePersonalization({
+      plan,
+      state,
+      ownerId: plan.ownerId,
+      now: new Date().toISOString(),
+      allocator: personalizationAllocator,
+    });
+
+  const enablePersonalization = () => {
+    const selected = personalizationForSelectedPlan();
+    if (selected === undefined) return;
+    const changed = changePersonalizationConsent({
+      state: selected.state,
+      action: 'enable',
+      now: new Date().toISOString(),
+    });
+    if (!changed.ok) {
+      setPersonalizationMessages((messages) => ({
+        ...messages,
+        [selected.plan.planId]: 'Suggestions could not be enabled. Try again.',
+      }));
+      return;
+    }
+    const evaluated = evaluateFor(selected.plan, changed.value);
+    const nextState = evaluated.ok ? evaluated.value.state : changed.value;
+    const message =
+      evaluated.ok && evaluated.value.createdProposal !== undefined
+        ? 'Suggestions enabled. A new suggestion is ready to review.'
+        : 'Suggestions enabled for this plan.';
+    persistPersonalization(
+      selected.plan.planId,
+      nextState,
+      selected.state.stateVersion,
+      message,
+    );
+  };
+
+  const changeConsent = (action: 'pause' | 'resume' | 'revoke') => {
+    const selected = personalizationForSelectedPlan();
+    if (selected === undefined) return;
+    const changed = changePersonalizationConsent({
+      state: selected.state,
+      action,
+      now: new Date().toISOString(),
+    });
+    if (!changed.ok) {
+      setPersonalizationMessages((messages) => ({
+        ...messages,
+        [selected.plan.planId]: 'That personalization action is not available right now.',
+      }));
+      return;
+    }
+    const message =
+      action === 'pause'
+        ? 'Suggestions paused. Confirmed progress is unchanged.'
+        : action === 'resume'
+          ? 'Suggestions resumed.'
+          : 'Personalization disabled. Feedback is no longer used for suggestions.';
+    persistPersonalization(
+      selected.plan.planId,
+      changed.value,
+      selected.state.stateVersion,
+      message,
+    );
+  };
+
+  const recordPersonalizationFeedback = (
+    area: PersonalizationFeedbackArea,
+    value: string,
+  ) => {
+    const selected = personalizationForSelectedPlan();
+    if (selected === undefined) return;
+    const recorded = recordLearnerFeedback({
+      plan: selected.plan,
+      state: selected.state,
+      ownerId: selected.plan.ownerId,
+      ...(focusedItemId === undefined ? {} : { itemId: focusedItemId }),
+      area,
+      value,
+      recordedAt: new Date().toISOString(),
+      allocator: personalizationAllocator,
+    });
+    if (!recorded.ok) {
+      setPersonalizationMessages((messages) => ({
+        ...messages,
+        [selected.plan.planId]: 'Feedback was not saved. Suggestions remain unchanged.',
+      }));
+      return;
+    }
+    const evaluated = evaluateFor(selected.plan, recorded.value.state);
+    const nextState = evaluated.ok ? evaluated.value.state : recorded.value.state;
+    const message =
+      evaluated.ok && evaluated.value.createdProposal !== undefined
+        ? 'Feedback saved. A suggestion is ready to review.'
+        : 'Feedback saved for this plan.';
+    persistPersonalization(
+      selected.plan.planId,
+      nextState,
+      selected.state.stateVersion,
+      message,
+    );
+  };
+
+  const correctPersonalizationFeedback = (
+    feedbackId: string,
+    area: PersonalizationFeedbackArea,
+    value: string,
+  ) => {
+    const selected = personalizationForSelectedPlan();
+    if (selected === undefined) return;
+    const corrected = correctLearnerFeedback({
+      plan: selected.plan,
+      state: selected.state,
+      ownerId: selected.plan.ownerId,
+      feedbackId,
+      area,
+      value,
+      recordedAt: new Date().toISOString(),
+      allocator: personalizationAllocator,
+    });
+    if (!corrected.ok) {
+      setPersonalizationMessages((messages) => ({
+        ...messages,
+        [selected.plan.planId]: 'That feedback could not be corrected. Refresh and try again.',
+      }));
+      return;
+    }
+    const evaluated = evaluateFor(selected.plan, corrected.value.state);
+    const nextState = evaluated.ok ? evaluated.value.state : corrected.value.state;
+    persistPersonalization(
+      selected.plan.planId,
+      nextState,
+      selected.state.stateVersion,
+      'Feedback corrected. Suggestions use the new bounded value.',
+    );
+  };
+
+  const deletePersonalizationFeedback = (feedbackId: string) => {
+    const selected = personalizationForSelectedPlan();
+    if (selected === undefined) return;
+    const deleted = deleteLearnerFeedback({
+      plan: selected.plan,
+      state: selected.state,
+      ownerId: selected.plan.ownerId,
+      feedbackId,
+      now: new Date().toISOString(),
+    });
+    if (!deleted.ok) {
+      setPersonalizationMessages((messages) => ({
+        ...messages,
+        [selected.plan.planId]: 'That feedback could not be deleted. Refresh and try again.',
+      }));
+      return;
+    }
+    const evaluated = evaluateFor(selected.plan, deleted.value);
+    const nextState = evaluated.ok ? evaluated.value.state : deleted.value;
+    persistPersonalization(
+      selected.plan.planId,
+      nextState,
+      selected.state.stateVersion,
+      'Feedback deleted and removed from future suggestions.',
+    );
+  };
+
+  const decidePersonalization = (
+    proposalId: string,
+    proposalVersion: number,
+    decision: 'accept' | 'reject',
+  ) => {
+    const selected = personalizationForSelectedPlan();
+    if (selected === undefined) return;
+    const decided = decidePersonalizationProposal({
+      plan: selected.plan,
+      state: selected.state,
+      ownerId: selected.plan.ownerId,
+      proposalId,
+      decision,
+      expectedProposalVersion: proposalVersion,
+      now: new Date().toISOString(),
+    });
+    if (!decided.ok) {
+      setPersonalizationMessages((messages) => ({
+        ...messages,
+        [selected.plan.planId]:
+          decided.category === 'stale_personalization' || decided.category === 'stale_revision'
+            ? 'That suggestion is out of date. Refresh before deciding.'
+            : 'That suggestion is no longer available.',
+      }));
+      return;
+    }
+    const message =
+      decision === 'reject'
+        ? 'Suggestion marked not useful. Your accepted plan is unchanged.'
+        : decided.value.handoff === undefined
+          ? 'Suggestion accepted. Your accepted plan is unchanged.'
+          : 'Request accepted for the connected AI client. Your accepted plan is unchanged.';
+    persistPersonalization(
+      selected.plan.planId,
+      decided.value.state,
+      selected.state.stateVersion,
+      message,
+    );
   };
   const confirmDelete = () => {
     setDeletionState('submitting');
@@ -406,9 +781,12 @@ export const App = () => {
     setDeletionState('available');
   };
   const refresh = () => {
-    setPlans(hydratePlans());
+    const nextPlans = hydratePlans();
+    setPlans(nextPlans);
+    setPersonalizationByPlan(hydratePersonalization(nextPlans));
     setActionStatesByPlan({});
     setProgressMessages({});
+    setPersonalizationMessages({});
     setDeletionState('available');
   };
 
@@ -445,12 +823,29 @@ export const App = () => {
             {...(progressMessages[selectedPlan.planId] === undefined
               ? {}
               : { progressMessage: progressMessages[selectedPlan.planId] })}
+            {...(selectedPersonalization === undefined
+              ? {}
+              : { personalization: selectedPersonalization })}
+            {...(displayedPlanId === undefined || personalizationMessages[displayedPlanId] === undefined
+              ? {}
+              : { personalizationMessage: personalizationMessages[displayedPlanId] })}
             onNavigate={navigate}
             onSelectItem={selectItem}
             onProgressAction={progressAction}
             onConfirmDelete={confirmDelete}
             onRetryDelete={retryDelete}
             onRefresh={refresh}
+            onEnablePersonalization={enablePersonalization}
+            onPausePersonalization={() => changeConsent('pause')}
+            onResumePersonalization={() => changeConsent('resume')}
+            onDisablePersonalization={() => changeConsent('revoke')}
+            onRecordFeedback={recordPersonalizationFeedback}
+            onCorrectFeedback={correctPersonalizationFeedback}
+            onDeleteFeedback={deletePersonalizationFeedback}
+            onAcceptProposal={(proposalId, proposalVersion) =>
+              decidePersonalization(proposalId, proposalVersion, 'accept')}
+            onRejectProposal={(proposalId, proposalVersion) =>
+              decidePersonalization(proposalId, proposalVersion, 'reject')}
           />
         )}
         <footer className="page-footer">
