@@ -11,6 +11,8 @@ export const CAPABILITY_SCOPES = [
   'plan:read',
   'plan:write',
   'progress:write',
+  'personalization:read',
+  'personalization:write',
 ] as const;
 
 export type CapabilityScope = (typeof CAPABILITY_SCOPES)[number];

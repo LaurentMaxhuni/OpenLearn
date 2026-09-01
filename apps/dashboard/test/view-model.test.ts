@@ -1,10 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  acceptedNoProgressFixture,
+  changePersonalizationConsent,
+  createPersonalizationState,
+  evaluatePersonalization,
+  recordLearnerFeedback,
+  type DomainResult,
+  type IdentityAllocator,
+  type Timestamp,
+} from '@openlearn/domain';
+import {
   safePlanHref,
   toPlanDetailViewModel,
   toPlanListViewModel,
+  toPersonalizationViewModel,
 } from '../src/view-model.js';
+
+const expectDomainSuccess = <T>(result: DomainResult<T>): T => {
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    throw new Error(`expected domain success, received ${result.category}`);
+  }
+  return result.value;
+};
+
+class ViewModelAllocator implements IdentityAllocator {
+  private nextValue = 0;
+
+  allocate(kind: Parameters<IdentityAllocator['allocate']>[0]): string {
+    this.nextValue += 1;
+    return `view-model-${kind}-${this.nextValue}`;
+  }
+}
 
 const snapshot = () => ({
     planId: 'plan-foundations',
@@ -178,4 +206,60 @@ test('builds deterministic list view models and encodes trusted plan references'
   assert.equal(list.plans[0]?.title, 'Web foundations');
   assert.equal(list.plans[1]?.contentState, 'partial');
   assert.equal(safePlanHref('plan/with spaces'), '/plans/plan%2Fwith%20spaces');
+});
+
+test('maps personalization state into scoped explanations, bounded controls, and proposal status', () => {
+  const plan = acceptedNoProgressFixture();
+  const timestamp = '2030-01-06T03:04:05Z' as Timestamp;
+  const initial = expectDomainSuccess(
+    createPersonalizationState({
+      ownerId: plan.ownerId,
+      planId: plan.planId,
+      now: timestamp,
+    }),
+  );
+  const enabled = expectDomainSuccess(
+    changePersonalizationConsent({
+      state: initial,
+      action: 'enable',
+      now: timestamp,
+    }),
+  );
+  const feedback = expectDomainSuccess(
+    recordLearnerFeedback({
+      plan,
+      state: enabled,
+      ownerId: plan.ownerId,
+      itemId: 'fixture-item-reading',
+      area: 'relevance',
+      value: 'not_relevant',
+      recordedAt: timestamp,
+      allocator: new ViewModelAllocator(),
+    }),
+  );
+  const evaluated = expectDomainSuccess(
+    evaluatePersonalization({
+      plan,
+      state: feedback.state,
+      ownerId: plan.ownerId,
+      now: timestamp,
+      allocator: new ViewModelAllocator(),
+    }),
+  );
+  const view = toPersonalizationViewModel(evaluated.state, {
+    itemLabels: new Map([['fixture-item-reading', 'Read the overview']]),
+    targetLabel: 'Read the overview',
+  });
+
+  assert.equal(view.state, 'enabled');
+  assert.equal(view.scopeLabel, 'This plan only');
+  assert.equal(view.feedbackTargetLabel, 'Read the overview');
+  assert.equal(view.feedback.length, 1);
+  assert.equal(view.feedback[0]?.valueLabel, 'Not relevant');
+  assert.equal(view.feedback[0]?.itemLabel, 'Read the overview');
+  assert.equal(view.feedbackAreas.length, 3);
+  assert.equal(view.proposals[0]?.title, 'Ask for a revised plan');
+  assert.deepEqual(view.proposals[0]?.basis, ['relevance feedback']);
+  assert.equal(view.proposals[0]?.canDecide, true);
+  assert.equal(view.explanation.includes('never changes automatically'), true);
 });

@@ -15,6 +15,8 @@ test('exports the exact capability scopes and lifecycle states', () => {
     'plan:read',
     'plan:write',
     'progress:write',
+    'personalization:read',
+    'personalization:write',
   ]);
   assert.deepEqual(APPLICATION_OPERATION_STATES, [
     'received',

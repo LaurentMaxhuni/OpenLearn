@@ -40,5 +40,15 @@ current-item confirmed progress, counts, and the first incomplete item. It
 does not construct routes or expose provider payloads, credentials, raw identity
 claims, operation-internal data, or unvalidated candidate content.
 
+## Personalization and learner feedback
+
+`createPersonalizationState` starts disabled for one owner and plan. The
+personalization functions accept only bounded difficulty, pace, and relevance
+feedback, evaluate deterministic suggestion-only proposals, and return opaque
+handoffs for any future connected-client revision request. Consent withdrawal,
+feedback correction/deletion, proposal expiry, current-revision fencing, and
+proposal decisions are domain transitions; they never mutate accepted plan
+content or learner-confirmed progress.
+
 The package intentionally has no runtime dependency on a UI framework, web
 server, MCP SDK, database, ORM, OAuth/OIDC SDK, or provider SDK.

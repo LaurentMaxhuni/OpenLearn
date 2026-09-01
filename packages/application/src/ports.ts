@@ -12,6 +12,10 @@ import type {
   IdentityAllocator,
   PlanId,
 } from '@openlearn/domain';
+import type {
+  InternalOwnerId,
+  PersonalizationState,
+} from '@openlearn/domain';
 
 export interface Clock {
   now(): Date;
@@ -19,6 +23,26 @@ export interface Clock {
 
 export interface OperationIdGenerator {
   next(): string;
+}
+
+export type PersonalizationWriteResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly kind: 'conflict' | 'unavailable' };
+
+export interface PersonalizationStatePort {
+  readPersonalization(
+    ownerId: InternalOwnerId,
+    planId: PlanId,
+  ): Promise<PersonalizationState | undefined>;
+  writePersonalization(
+    state: PersonalizationState,
+    expectedStateVersion: number,
+  ): Promise<PersonalizationWriteResult>;
+  purgePersonalization(
+    ownerId: InternalOwnerId,
+    planId: PlanId,
+    expectedStateVersion?: number,
+  ): Promise<PersonalizationWriteResult>;
 }
 
 export interface ApplicationStatePort {

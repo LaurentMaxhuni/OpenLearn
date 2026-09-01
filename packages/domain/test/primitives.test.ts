@@ -359,6 +359,7 @@ test('defines every error category with safe machine-readable detail fields', ()
     ['unknown_field', 'unknown_field'],
     ['stale_revision', 'stale_revision'],
     ['stale_progress', 'stale_progress'],
+    ['stale_personalization', 'stale_personalization'],
     ['invalid_transition', 'transition_not_allowed'],
     ['deletion_conflict', 'deletion_conflict'],
     ['owner_unavailable', 'owner_unavailable'],
@@ -410,6 +411,8 @@ test('exports identifier allocation kinds and supports deterministic allocators'
     'plan_item',
     'resource',
     'internal_owner',
+    'feedback',
+    'proposal',
   ];
 
   class DeterministicAllocator implements IdentityAllocator {
@@ -439,6 +442,8 @@ test('exports identifier allocation kinds and supports deterministic allocators'
     'fixture-plan_item-001',
     'fixture-resource-001',
     'fixture-internal_owner-001',
+    'fixture-feedback-001',
+    'fixture-proposal-001',
   ]);
 });
 

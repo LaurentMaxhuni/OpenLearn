@@ -11,6 +11,7 @@ export const DOMAIN_ERROR_CATEGORIES = [
   'unknown_field',
   'stale_revision',
   'stale_progress',
+  'stale_personalization',
   'invalid_transition',
   'deletion_conflict',
   'owner_unavailable',
@@ -36,6 +37,7 @@ export type DomainErrorCode =
   | 'unknown_field'
   | 'stale_revision'
   | 'stale_progress'
+  | 'stale_personalization'
   | 'transition_not_allowed'
   | 'deletion_conflict'
   | 'owner_unavailable'

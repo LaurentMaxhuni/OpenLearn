@@ -16,6 +16,7 @@ export const APPLICATION_ERROR_CODES = [
   'unavailable',
   'invalid_input',
   'domain_rejected',
+  'stale_personalization',
   'internal_failure',
 ] as const;
 
