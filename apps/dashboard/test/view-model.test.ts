@@ -101,8 +101,32 @@ test('maps accepted domain snapshots into ordered dashboard detail view models',
   assert.equal(view.nextAction?.itemId, 'item-request');
   assert.equal(view.focusedItem?.itemId, 'item-request');
   assert.equal(view.focusedItem?.progressState, 'not_started');
+  assert.equal(view.focusedItem?.action.kind, 'start');
+  assert.equal(view.focusedItem?.action.label, 'Start item');
   assert.equal(view.outline[0]?.children[0]?.children[0]?.title, 'Read the overview');
   assert.equal(view.outline[0]?.children[0]?.children[1]?.title, 'Trace a request');
+});
+
+test('labels in-progress items as complete and keeps retryable actions enabled', () => {
+  const base = snapshot();
+  const inProgress = base.currentProgress.map((record) =>
+    record.itemId === 'item-request'
+      ? { ...record, state: 'in_progress' as const }
+      : record,
+  );
+  const inProgressView = toPlanDetailViewModel(
+    { ...base, currentProgress: inProgress },
+    { href: '/plans/plan-foundations' },
+  );
+  assert.equal(inProgressView.focusedItem?.action.kind, 'complete');
+  assert.equal(inProgressView.focusedItem?.action.label, 'Mark complete');
+
+  const retryView = toPlanDetailViewModel(base, {
+    href: '/plans/plan-foundations',
+    actionStates: { 'item-request': 'failed_retryable' },
+  });
+  assert.equal(retryView.focusedItem?.action.state, 'failed_retryable');
+  assert.equal(retryView.focusedItem?.action.enabled, true);
 });
 
 test('keeps partial diagnostics visible without inventing missing content', () => {

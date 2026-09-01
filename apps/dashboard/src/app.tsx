@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { ActivePlanAggregate } from '@openlearn/domain';
 import {
   AppShell,
   DashboardDetail,
@@ -9,16 +10,26 @@ import {
   RecoveryPanel,
   type ContentState,
   type DeletionState,
+  type LearnerActionKind,
+  type LearnerActionState,
   type PlanDataControlsViewModel,
 } from '@openlearn/ui';
 import {
   STATIC_PLANS,
   STATIC_PREVIEW_OPTIONS,
-  STATIC_SNAPSHOTS,
-  STATIC_SNAPSHOT_BY_ID,
+  STATIC_OWNER,
+  snapshotOfPlan,
   type StaticPreviewState,
 } from './seed-data.js';
+import { applyDashboardProgressAction } from './progress-actions.js';
+import { createProgressStore, type DashboardStorage } from './progress-store.js';
 import {
+  actionStatesForPlan,
+  setActionState,
+  type ActionStatesByPlan,
+} from './action-state.js';
+import {
+  type AcceptedPlanSnapshotInput,
   safePlanHref,
   toPlanDetailViewModel,
   toPlanListViewModel,
@@ -62,6 +73,21 @@ const dataControlsFor = (state: DeletionState): PlanDataControlsViewModel => ({
 const previewLabel = (value: StaticPreviewState): string =>
   STATIC_PREVIEW_OPTIONS.find((option) => option.value === value)?.label ?? 'Accepted plan';
 
+const browserStorage = (): DashboardStorage | undefined => {
+  try {
+    return typeof window === 'undefined' ? undefined : window.localStorage;
+  } catch {
+    return undefined;
+  }
+};
+
+const planMap = (
+  store: ReturnType<typeof createProgressStore>,
+): Map<string, ActivePlanAggregate> =>
+  new Map(
+    STATIC_PLANS.map((plan) => [plan.planId, store.hydrate(plan)]),
+  );
+
 const PreviewControl = ({
   value,
   onChange,
@@ -93,21 +119,23 @@ const StaticNotice = ({ state }: { readonly state: StaticPreviewState }) => (
 
 const PlansPage = ({
   preview,
+  snapshots,
   onNavigate,
 }: {
   readonly preview: StaticPreviewState;
+  readonly snapshots: readonly AcceptedPlanSnapshotInput[];
   readonly onNavigate: (href: string) => void;
 }) => {
   const entries = useMemo(
     () =>
-      STATIC_SNAPSHOTS.map((snapshot, index) => ({
+      snapshots.map((snapshot, index) => ({
         snapshot,
         href: safePlanHref(snapshot.planId),
         ...(index === 0 && ['partial', 'invalid', 'pending', 'recovering'].includes(preview)
           ? { contentState: contentStateFor(preview) }
           : {}),
       })),
-    [preview],
+    [preview, snapshots],
   );
   const model =
     preview === 'empty'
@@ -155,9 +183,11 @@ const UnavailablePage = ({ onNavigate }: { readonly onNavigate: (href: string) =
 const DetailPage = ({
   planId,
   preview,
+  snapshotsById,
   focusedItemId,
   actionStates,
   deletionState,
+  progressMessage,
   onNavigate,
   onSelectItem,
   onProgressAction,
@@ -167,12 +197,14 @@ const DetailPage = ({
 }: {
   readonly planId: string;
   readonly preview: StaticPreviewState;
+  readonly snapshotsById: ReadonlyMap<string, AcceptedPlanSnapshotInput>;
   readonly focusedItemId?: string;
-  readonly actionStates: Readonly<Record<string, 'available' | 'submitting' | 'confirmed' | 'conflict' | 'failed_retryable' | 'unavailable'>>;
+  readonly actionStates: Readonly<Record<string, LearnerActionState>>;
   readonly deletionState: DeletionState;
+  readonly progressMessage?: string;
   readonly onNavigate: (href: string) => void;
   readonly onSelectItem: (itemId: string) => void;
-  readonly onProgressAction: (itemId: string) => void;
+  readonly onProgressAction: (itemId: string, action: LearnerActionKind) => void;
   readonly onConfirmDelete: () => void;
   readonly onRetryDelete: () => void;
   readonly onRefresh: () => void;
@@ -211,7 +243,7 @@ const DetailPage = ({
   }
 
   const sourcePlanId = preview === 'partial' ? 'static-plan-partial' : preview === 'completed' || preview === 'conflict' ? 'static-plan-progress' : planId;
-  const snapshot = STATIC_SNAPSHOT_BY_ID.get(sourcePlanId);
+  const snapshot = snapshotsById.get(sourcePlanId);
   if (snapshot === undefined) {
     return <UnavailablePage onNavigate={onNavigate} />;
   }
@@ -229,6 +261,7 @@ const DetailPage = ({
       ? { contentState: contentStateFor(preview) }
       : {}),
     ...(Object.keys(actionStates).length === 0 ? {} : { actionStates }),
+    ...(progressMessage === undefined ? {} : { progressMessage }),
     ...(operation === undefined ? {} : { operation }),
     dataControls: dataControlsFor(deletionState),
   });
@@ -256,11 +289,27 @@ const DetailPage = ({
 };
 
 export const App = () => {
+  const progressStore = useMemo(
+    () => createProgressStore(browserStorage()),
+    [],
+  );
+  const hydratePlans = () => planMap(progressStore);
+  const [plans, setPlans] = useState<Map<string, ActivePlanAggregate>>(() => hydratePlans());
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const [preview, setPreview] = useState<StaticPreviewState>('accepted');
   const [focusedItemId, setFocusedItemId] = useState<string | undefined>();
-  const [actionStates, setActionStates] = useState<Readonly<Record<string, 'available' | 'submitting' | 'confirmed' | 'conflict' | 'failed_retryable' | 'unavailable'>>>({});
+  const [actionStatesByPlan, setActionStatesByPlan] = useState<ActionStatesByPlan>({});
   const [deletionState, setDeletionState] = useState<DeletionState>('available');
+  const [progressMessages, setProgressMessages] = useState<Readonly<Record<string, string>>>({});
+
+  const snapshots = useMemo(
+    () => [...plans.values()].map((plan) => snapshotOfPlan(plan, STATIC_OWNER)),
+    [plans],
+  );
+  const snapshotsById = useMemo(
+    () => new Map(snapshots.map((snapshot) => [snapshot.planId, snapshot])),
+    [snapshots],
+  );
 
   useEffect(() => {
     const onPopState = () => {
@@ -278,10 +327,7 @@ export const App = () => {
   };
   const route = routeForPath(pathname);
   const selectedPlanId = route.kind === 'plan' ? route.planId : undefined;
-  const selectedPlan =
-    selectedPlanId === undefined
-      ? undefined
-      : STATIC_PLANS.find((plan) => plan.planId === selectedPlanId);
+  const selectedPlan = selectedPlanId === undefined ? undefined : plans.get(selectedPlanId);
 
   const selectItem = (itemId: string) => {
     setFocusedItemId(itemId);
@@ -291,8 +337,67 @@ export const App = () => {
       block: 'start',
     });
   };
-  const progressAction = (itemId: string) => {
-    setActionStates((states) => ({ ...states, [itemId]: 'submitting' }));
+  const progressAction = (itemId: string, action: LearnerActionKind) => {
+    if (selectedPlanId === undefined) {
+      return;
+    }
+    const plan = plans.get(selectedPlanId);
+    if (plan === undefined) {
+      return;
+    }
+    setActionStatesByPlan((states) =>
+      setActionState(states, selectedPlanId, itemId, 'submitting'),
+    );
+    const result = applyDashboardProgressAction({
+      plan,
+      itemId,
+      action,
+      confirmedAt: new Date().toISOString(),
+    });
+    if (!result.ok) {
+      setActionStatesByPlan((states) =>
+        setActionState(
+          states,
+          selectedPlanId,
+          itemId,
+          result.kind === 'conflict' ? 'conflict' : 'unavailable',
+        ),
+      );
+      setProgressMessages((messages) => ({
+        ...messages,
+        [selectedPlanId]: result.message,
+      }));
+      return;
+    }
+    const saveResult = progressStore.save(result.plan, plan);
+    if (!saveResult.ok) {
+      setActionStatesByPlan((states) =>
+        setActionState(
+          states,
+          selectedPlanId,
+          itemId,
+          saveResult.kind === 'conflict' ? 'conflict' : 'failed_retryable',
+        ),
+      );
+      setProgressMessages((messages) => ({
+        ...messages,
+        [selectedPlanId]:
+          saveResult.kind === 'conflict'
+            ? 'Progress changed in another session. Refresh before trying again.'
+            : 'Your confirmed progress is unchanged. Try again when ready.',
+      }));
+      return;
+    }
+    setPlans((currentPlans) =>
+      new Map(currentPlans).set(result.plan.planId, result.plan),
+    );
+    setActionStatesByPlan((states) =>
+      setActionState(states, selectedPlanId, itemId, 'available'),
+    );
+    setProgressMessages((messages) => ({
+      ...messages,
+      [selectedPlanId]: result.message,
+    }));
   };
   const confirmDelete = () => {
     setDeletionState('submitting');
@@ -301,7 +406,9 @@ export const App = () => {
     setDeletionState('available');
   };
   const refresh = () => {
-    setActionStates({});
+    setPlans(hydratePlans());
+    setActionStatesByPlan({});
+    setProgressMessages({});
     setDeletionState('available');
   };
 
@@ -324,16 +431,20 @@ export const App = () => {
         {route.kind === 'unknown' ? (
           <UnavailablePage onNavigate={navigate} />
         ) : route.kind === 'plans' ? (
-          <PlansPage preview={preview} onNavigate={navigate} />
+          <PlansPage preview={preview} snapshots={snapshots} onNavigate={navigate} />
         ) : selectedPlan === undefined ? (
           <UnavailablePage onNavigate={navigate} />
         ) : (
           <DetailPage
             planId={selectedPlan.planId}
             preview={preview}
+            snapshotsById={snapshotsById}
             {...(focusedItemId === undefined ? {} : { focusedItemId })}
-            actionStates={actionStates}
+            actionStates={actionStatesForPlan(actionStatesByPlan, selectedPlan.planId)}
             deletionState={deletionState}
+            {...(progressMessages[selectedPlan.planId] === undefined
+              ? {}
+              : { progressMessage: progressMessages[selectedPlan.planId] })}
             onNavigate={navigate}
             onSelectItem={selectItem}
             onProgressAction={progressAction}
@@ -344,7 +455,7 @@ export const App = () => {
         )}
         <footer className="page-footer">
           <span>OpenLearn static dashboard preview</span>
-          <span>Deterministic fixture · no live integrations</span>
+          <span>Browser-local progress · no live service connected</span>
         </footer>
       </main>
     </AppShell>

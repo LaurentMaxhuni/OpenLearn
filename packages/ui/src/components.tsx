@@ -5,6 +5,7 @@ import type {
   ContextViewModel,
   DeletionState,
   GoalViewModel,
+  LearnerActionKind,
   LearnerActionViewModel,
   LearnerProgressState,
   NextActionViewModel,
@@ -518,7 +519,7 @@ export const LearnerProgressAction = ({
 
 export interface PlanItemDetailProps {
   readonly item?: PlanItemViewModel;
-  readonly onProgressAction?: (itemId: string) => void;
+  readonly onProgressAction?: (itemId: string, action: LearnerActionKind) => void;
 }
 
 export const PlanItemDetail = ({ item, onProgressAction }: PlanItemDetailProps) => (
@@ -546,7 +547,7 @@ export const PlanItemDetail = ({ item, onProgressAction }: PlanItemDetailProps) 
           action={item.action}
           {...(onProgressAction === undefined
             ? {}
-            : { onAction: () => onProgressAction(item.itemId) })}
+            : { onAction: () => onProgressAction(item.itemId, item.action.kind) })}
         />
         <ResourceList resources={item.resources} />
       </>
@@ -811,7 +812,7 @@ export const PlanCollection = ({ model, onNavigate }: PlanCollectionProps) => {
 export interface DashboardDetailProps {
   readonly model: PlanDetailViewModel;
   readonly onSelectItem?: (itemId: string) => void;
-  readonly onProgressAction?: (itemId: string) => void;
+  readonly onProgressAction?: (itemId: string, action: LearnerActionKind) => void;
   readonly onConfirmDelete?: () => void;
   readonly onRetryDelete?: () => void;
   readonly onRefresh?: () => void;
@@ -837,7 +838,12 @@ export const DashboardDetail = ({
         {...(model.goal === undefined ? {} : { goal: model.goal })}
         {...(model.context === undefined ? {} : { context: model.context })}
       />
-      <ProgressSummary progress={model.progress} />
+      <ProgressSummary
+        progress={model.progress}
+        {...(model.progressMessage === undefined
+          ? {}
+          : { actionMessage: model.progressMessage })}
+      />
       <NextActionCard
         {...(model.nextAction === undefined ? {} : { nextAction: model.nextAction })}
         {...(onSelectItem === undefined ? {} : { onSelect: onSelectItem })}
