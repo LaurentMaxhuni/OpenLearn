@@ -5,7 +5,6 @@ import {
   brandIdentifier,
   readOwnedAcceptedSnapshot,
   type ActivePlanAggregate,
-  type AcceptedPlanSnapshot,
   type InternalOwnerId,
   type PlanId,
 } from '@openlearn/domain';
@@ -56,7 +55,7 @@ const rekeyPlan = (plan: ActivePlanAggregate, planIdValue: string): ActivePlanAg
   };
 };
 
-const snapshotOf = (
+export const snapshotOfPlan = (
   plan: ActivePlanAggregate,
   ownerId: InternalOwnerId = plan.ownerId,
 ): AcceptedPlanSnapshotInput => {
@@ -64,7 +63,14 @@ const snapshotOf = (
   if (!result.ok) {
     throw new Error(`invalid static snapshot: ${result.category}`);
   }
-  return result.value as AcceptedPlanSnapshot;
+  return result.value as AcceptedPlanSnapshotInput;
+};
+
+const snapshotOf = (
+  plan: ActivePlanAggregate,
+  ownerId: InternalOwnerId = plan.ownerId,
+): AcceptedPlanSnapshotInput => {
+  return snapshotOfPlan(plan, ownerId);
 };
 
 const noProgressPlan = rekeyPlan(

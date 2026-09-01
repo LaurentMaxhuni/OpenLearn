@@ -79,6 +79,7 @@ export interface ViewModelOptions {
   readonly focusedItemId?: string;
   readonly contentState?: ContentState;
   readonly actionStates?: Readonly<Record<string, LearnerActionState>>;
+  readonly progressMessage?: string;
   readonly operation?: PlanDetailViewModel['operation'];
   readonly recovery?: PlanDetailViewModel['recovery'];
   readonly dataControls?: PlanDataControlsViewModel;
@@ -194,21 +195,24 @@ const toAction = (
   state: LearnerProgressState,
   actionState: LearnerActionState,
 ): LearnerActionViewModel => {
-  const completed = state === 'completed_by_learner';
-  const enabled = actionState === 'available';
+  const action =
+    state === 'not_started'
+      ? { kind: 'start' as const, label: 'Start item' }
+      : state === 'in_progress'
+        ? { kind: 'complete' as const, label: 'Mark complete' }
+        : { kind: 'undo_completion' as const, label: 'Undo completion' };
+  const enabled = actionState === 'available' || actionState === 'failed_retryable';
   const disabledReason = enabled
     ? undefined
     : actionState === 'submitting'
       ? 'This action is being submitted.'
       : actionState === 'conflict'
         ? 'Refresh this plan before trying again.'
-        : actionState === 'failed_retryable'
-          ? 'This action failed. Try again when ready.'
-          : 'This action is not available right now.';
+        : 'This action is not available right now.';
 
   return {
-    kind: completed ? 'undo_completion' : 'complete',
-    label: completed ? 'Undo completion' : 'Mark complete',
+    kind: action.kind,
+    label: action.label,
     state: actionState,
     enabled,
     ...(disabledReason === undefined ? {} : { disabledReason }),
@@ -336,6 +340,9 @@ export const toPlanDetailViewModel = (
     goal,
     ...(context === undefined ? {} : { context }),
     progress: toProgress(snapshot),
+    ...(options.progressMessage === undefined
+      ? {}
+      : { progressMessage: options.progressMessage }),
     ...(nextActionViewModel === undefined
       ? {}
       : { nextAction: nextActionViewModel }),

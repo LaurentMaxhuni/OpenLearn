@@ -21,7 +21,7 @@ export type LearnerProgressState =
   | 'in_progress'
   | 'completed_by_learner';
 
-export type LearnerActionKind = 'complete' | 'undo_completion';
+export type LearnerActionKind = 'start' | 'complete' | 'undo_completion';
 
 export type LearnerActionState =
   | 'available'
@@ -159,6 +159,7 @@ export interface PlanDetailViewModel {
   readonly goal?: GoalViewModel;
   readonly context?: ContextViewModel;
   readonly progress: ProgressSummaryViewModel;
+  readonly progressMessage?: string;
   readonly nextAction?: NextActionViewModel;
   readonly outline: readonly OutlineNodeViewModel[];
   readonly focusedItem?: PlanItemViewModel;
