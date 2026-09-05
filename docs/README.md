@@ -1,6 +1,6 @@
 # OpenLearn documentation
 
-This directory explains the product direction and contributor-facing delivery sequence for OpenLearn. The project is in an early stage: the learning dashboard, AI orchestration, and MCP integration described here are planned work rather than currently available features.
+This directory explains the product direction and contributor-facing delivery sequence for OpenLearn. The local domain, application, MCP, service, dashboard, progress, personalization, and Phase 9 quality slices are implemented and documented; hosted identity, persistence, provider, and deployment integration remain future work.
 
 ## Public documentation
 
@@ -24,6 +24,8 @@ The detailed phase documents are listed below:
 10. [Phase 9: Quality, security, accessibility, and performance](phases/phase-09-quality-security-accessibility-and-performance.md)
 11. [Phase 10: Beta, deployment, operations, and community release](phases/phase-10-beta-deployment-operations-and-community-release.md)
 
+Phase 9 evidence is recorded in the [quality-gate record](quality/PHASE-9-QUALITY-GATE.md), [threat model](security/THREAT-MODEL.md), [security review](security/SECURITY-REVIEW.md), and [privacy review](privacy/PRIVACY-REVIEW.md).
+
 ## For contributors
 
 Read the [repository README](../README.md) for the project overview and current scope. Read the [contribution guide](../CONTRIBUTING.md) before opening an issue or pull request. The [GitHub repository](https://github.com/LaurentMaxhuni/OpenLearn) is the place to discuss product direction and implementation work.
@@ -31,6 +33,7 @@ Read the [repository README](../README.md) for the project overview and current 
 ## Keeping this documentation truthful
 
 - `Complete` means the phase exit criteria have been satisfied.
+- `Local slice` means the local implementation and tests are present, while hosted adapters remain deferred.
 - `Next` identifies the current phase that should receive focused work.
 - `Planned` identifies work whose prerequisites are not complete.
 - Planned capabilities must not be described as available features.

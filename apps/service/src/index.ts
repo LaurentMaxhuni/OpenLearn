@@ -4,12 +4,14 @@ import {
   createMcpServer,
   createStdioServerTransport,
   createStatelessStreamableHttpServerTransport,
+  MCP_MAX_REQUEST_BYTES,
 } from '@openlearn/mcp';
 import type {
   ActorContext,
   OpenLearnApplication,
   OperationIdGenerator,
 } from '@openlearn/application';
+import { securityHeaders, setRawSecurityHeaders } from './security.js';
 
 export interface ServiceConfig {
   readonly dashboardOrigin: string;
@@ -118,11 +120,24 @@ const originAllowed = (
 export const createService = (options: ServiceOptions): OpenLearnService => {
   requireDependencies(options.dependencies);
   const config = validateConfig(options.config);
-  const app = Fastify({ logger: false });
+  const app = Fastify({
+    logger: false,
+    bodyLimit: MCP_MAX_REQUEST_BYTES,
+  });
+
+  app.addHook('onSend', async (_request, reply, payload) => {
+    securityHeaders(reply);
+    return payload;
+  });
 
   app.get('/health/live', async () => ({ status: 'ok' }));
   app.get('/health/ready', async (_request, reply) => {
-    const ready = await options.readiness?.() ?? true;
+    let ready = true;
+    try {
+      ready = await options.readiness?.() ?? true;
+    } catch {
+      ready = false;
+    }
     if (!ready) {
       return reply.code(503).send({ status: 'not_ready' });
     }
@@ -164,6 +179,7 @@ export const createService = (options: ServiceOptions): OpenLearnService => {
       enableJsonResponse: true,
     });
 
+    setRawSecurityHeaders(reply.raw);
     reply.hijack();
     try {
       await connectMcpServer(mcpServer, transport);

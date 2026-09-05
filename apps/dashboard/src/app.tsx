@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   changePersonalizationConsent,
   correctLearnerFeedback,
@@ -393,6 +393,7 @@ export const App = () => {
   const [focusedItemId, setFocusedItemId] = useState<string | undefined>();
   const [actionStatesByPlan, setActionStatesByPlan] = useState<ActionStatesByPlan>({});
   const [deletionState, setDeletionState] = useState<DeletionState>('available');
+  const hasNavigatedRef = useRef(false);
   const [progressMessages, setProgressMessages] = useState<Readonly<Record<string, string>>>({});
   const [personalizationMessages, setPersonalizationMessages] = useState<
     Readonly<Record<string, string>>
@@ -409,6 +410,7 @@ export const App = () => {
 
   useEffect(() => {
     const onPopState = () => {
+      hasNavigatedRef.current = true;
       setPathname(window.location.pathname);
       setFocusedItemId(undefined);
     };
@@ -416,7 +418,16 @@ export const App = () => {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  useEffect(() => {
+    if (!hasNavigatedRef.current) {
+      return;
+    }
+    const main = document.getElementById('main-content');
+    main?.focus({ preventScroll: true });
+  }, [pathname]);
+
   const navigate = (href: string) => {
+    hasNavigatedRef.current = true;
     window.history.pushState({}, '', href);
     setPathname(window.location.pathname);
     setFocusedItemId(undefined);
@@ -433,12 +444,25 @@ export const App = () => {
 
   const selectItem = (itemId: string) => {
     setFocusedItemId(itemId);
+  };
+
+  useEffect(() => {
+    if (focusedItemId === undefined) {
+      return;
+    }
+    const target = document.querySelector<HTMLElement>(
+      '[data-focus-target="focused-item"]',
+    );
+    if (target === null) {
+      return;
+    }
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    document.getElementById('focused-item-heading')?.scrollIntoView({
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({
       behavior: prefersReducedMotion ? 'auto' : 'smooth',
       block: 'start',
     });
-  };
+  }, [focusedItemId]);
   const progressAction = (itemId: string, action: LearnerActionKind) => {
     if (selectedPlanId === undefined) {
       return;
@@ -805,7 +829,7 @@ export const App = () => {
         />
       }
     >
-      <main id="main-content" className="page-main">
+      <main id="main-content" className="page-main" tabIndex={-1}>
         {route.kind === 'unknown' ? (
           <UnavailablePage onNavigate={navigate} />
         ) : route.kind === 'plans' ? (

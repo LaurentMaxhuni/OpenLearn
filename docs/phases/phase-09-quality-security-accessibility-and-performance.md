@@ -2,11 +2,21 @@
 
 ## Status
 
-Planned
+Complete (local verification)
 
 ## Objective
 
 Establish evidence-based quality, security, accessibility, performance, and resilience gates for the complete OpenLearn experience.
+
+## Implemented and verified (2026-09-05)
+
+- Dependency-free source and bundle gates run through the root `verify` command; the dashboard bundle is 288,680 JavaScript bytes, 18,051 CSS bytes, and 306,731 total bytes against the configured 358,400 / 102,400 / 460,800-byte budgets.
+- Domain, application, dashboard, MCP, service, UI compile, journey, resilience, retention, and protocol-contract checks pass under the bundled Node 24 runtime.
+- The service has bounded request bodies, strict protocol field limits, fail-closed Origin/authentication ordering, generic errors, and tested security headers on normal and hijacked responses.
+- Keyboard and narrow-width inspection covers skip-link navigation, route focus, item focus, progress status, personalization status, disclosure controls, resource links, visible focus rings, no duplicate IDs, and no horizontal overflow.
+- Threat, privacy, and retention records are linked from the documentation index. The standard Codex Security scan is recorded as partial with no reportable findings in reviewed surfaces; TAC was not granted and delegated worker coverage was limited by account usage.
+
+This completion applies to the local implementation and explicitly does not certify production identity, PostgreSQL, live AI/provider, telemetry, TLS/ingress, rate-limit, or hosted deletion behavior.
 
 ## Why this phase matters
 

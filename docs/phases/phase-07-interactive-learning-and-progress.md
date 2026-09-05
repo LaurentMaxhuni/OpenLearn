@@ -2,11 +2,20 @@
 
 ## Status
 
-Planned
+Local slice
 
 ## Objective
 
 Allow learners to manage permitted plan items and persist meaningful progress that drives the dashboard from domain state.
+
+## Implemented local slice (2026-09-05)
+
+- `@openlearn/domain` owns explicit start, complete, and undo-completion transitions with owner, revision, item, and progress-version checks.
+- `@openlearn/application` coordinates capability-scoped progress actions, idempotency, cancellation, recovery, and safe storage-failure outcomes.
+- The dashboard exposes learner-readable action status, next-item navigation, focus targets, and a validating browser-local progress adapter for deterministic preview use.
+- Journey, stale-state, storage-failure, and accepted-plan-preservation tests pass in the Phase 9 verification record.
+
+The slice is intentionally not a hosted persistence implementation. PostgreSQL transactions, authenticated server reads, cross-instance recovery, and deployment operations remain Phase 10 work.
 
 ## Why this phase matters
 

@@ -12,6 +12,10 @@ import { z } from 'zod';
 
 export const MCP_CONTRACT_VERSION = 'openlearn.phase6.v1' as const;
 
+export const MCP_MAX_REQUEST_BYTES = 512 * 1024;
+export const MCP_MAX_IDEMPOTENCY_KEY_LENGTH = 128;
+export const MCP_MAX_TIMESTAMP_LENGTH = 64;
+
 export const MCP_TOOL_NAMES = [
   'openlearn.create_plan_view',
   'openlearn.get_plan_view',
@@ -21,19 +25,31 @@ export const MCP_TOOL_NAMES = [
 const identifierSchema = z
   .string()
   .regex(/^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}$/u);
+const boundedIdempotencyKeySchema = z
+  .string()
+  .min(1)
+  .max(MCP_MAX_IDEMPOTENCY_KEY_LENGTH)
+  .regex(/^[\x21-\x7e]+$/u);
+const boundedTimestampSchema = z
+  .string()
+  .max(MCP_MAX_TIMESTAMP_LENGTH)
+  .datetime({ offset: true });
 const candidateSchema = z.union([
   z.null(),
-  z.string(),
+  z.string().max(20_000),
   z.number(),
   z.boolean(),
-  z.array(z.unknown()),
-  z.record(z.string(), z.unknown()),
+  z.array(z.unknown()).max(256),
+  z.record(z.string().max(128), z.unknown()).refine(
+    (value) => Object.keys(value).length <= 256,
+    'candidate object has too many keys',
+  ),
 ]);
 
 export const createPlanViewInputSchema = z.strictObject({
-  idempotencyKey: z.string().min(1),
+  idempotencyKey: boundedIdempotencyKeySchema,
   candidate: candidateSchema,
-  acceptedAt: z.string().datetime({ offset: true }),
+  acceptedAt: boundedTimestampSchema,
   planId: identifierSchema.optional(),
   expectedRevisionId: identifierSchema.optional(),
 });
@@ -48,8 +64,8 @@ export const applyProgressActionInputSchema = z.strictObject({
   action: z.enum(['start_item', 'complete_item', 'undo_completion']),
   expectedRevisionId: identifierSchema,
   expectedProgressVersion: z.number().int().nonnegative(),
-  idempotencyKey: z.string().min(1),
-  confirmedAt: z.string().datetime({ offset: true }),
+  idempotencyKey: boundedIdempotencyKeySchema,
+  confirmedAt: boundedTimestampSchema,
 });
 
 const operationSchema = {

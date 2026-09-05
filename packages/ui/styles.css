@@ -204,7 +204,7 @@ a {
 }
 
 .preview-control select {
-  min-height: 40px;
+  min-height: 44px;
   max-width: 190px;
   padding: 0 34px 0 var(--space-3);
   border: 1px solid var(--color-border-strong);
@@ -722,7 +722,7 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  min-height: 32px;
+  min-height: 44px;
   font-weight: 800;
   text-decoration: none;
 }
@@ -833,7 +833,7 @@ p {
 }
 
 .personalization-panel select {
-  min-height: 42px;
+  min-height: 44px;
   padding: 8px 10px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
@@ -847,6 +847,10 @@ p {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.personalization-row-actions select {
+  min-width: min(100%, 18rem);
 }
 
 .personalization-list > li {
@@ -1158,5 +1162,17 @@ p {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 3px solid CanvasText;
+  }
+
+  .button,
+  .preview-control select,
+  .personalization-panel select {
+    border-color: ButtonText;
   }
 }

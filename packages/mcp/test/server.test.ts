@@ -9,6 +9,8 @@ import type {
 } from '@openlearn/application';
 import {
   MCP_CONTRACT_VERSION,
+  MCP_MAX_IDEMPOTENCY_KEY_LENGTH,
+  MCP_MAX_TIMESTAMP_LENGTH,
   MCP_TOOL_NAMES,
   applyProgressActionInputSchema,
   createPlanViewInputSchema,
@@ -183,6 +185,33 @@ test('rejects credential, owner, redirect, identifier, and version fields at the
       idempotencyKey: 'schema-progress',
       confirmedAt: '2030-01-06T03:04:05Z',
       redirectUri: 'https://attacker.example.test',
+    }).success,
+    false,
+  );
+});
+
+test('bounds protocol strings and candidate collections before application work', () => {
+  assert.equal(
+    createPlanViewInputSchema.safeParse({
+      idempotencyKey: 'a'.repeat(MCP_MAX_IDEMPOTENCY_KEY_LENGTH + 1),
+      candidate: { goal: 'learn' },
+      acceptedAt: '2030-01-06T03:04:05Z',
+    }).success,
+    false,
+  );
+  assert.equal(
+    createPlanViewInputSchema.safeParse({
+      idempotencyKey: 'bounded',
+      candidate: Array.from({ length: 257 }, () => 'value'),
+      acceptedAt: '2030-01-06T03:04:05Z',
+    }).success,
+    false,
+  );
+  assert.equal(
+    createPlanViewInputSchema.safeParse({
+      idempotencyKey: 'bounded',
+      candidate: { goal: 'learn' },
+      acceptedAt: `2030-01-06T03:04:05.${'0'.repeat(MCP_MAX_TIMESTAMP_LENGTH)}Z`,
     }).success,
     false,
   );

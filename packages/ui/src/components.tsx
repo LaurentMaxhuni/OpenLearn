@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import type {
   ContentState,
@@ -80,6 +80,9 @@ const navigationClick = (
     onNavigate(href);
   }
 };
+
+const useScopedId = (prefix: string): string =>
+  `${prefix}-${useId().replaceAll(':', '')}`;
 
 export interface AppShellProps {
   readonly children: ReactNode;
@@ -209,39 +212,42 @@ export interface GoalContextProps {
   readonly context?: ContextViewModel;
 }
 
-export const GoalContext = ({ goal, context }: GoalContextProps) => (
-  <section className="panel goal-panel" aria-labelledby="goal-heading">
-    <div className="section-heading">
-      <p className="eyebrow">Orientation</p>
-      <h2 id="goal-heading">Goal and context</h2>
-    </div>
-    {goal === undefined ? (
-      <p className="muted">No accepted goal is available.</p>
-    ) : (
-      <div className="goal-content">
-        <h3>{goal.title}</h3>
-        {goal.description === undefined ? null : <p>{goal.description}</p>}
+export const GoalContext = ({ goal, context }: GoalContextProps) => {
+  const headingId = useScopedId('goal-heading');
+  return (
+    <section className="panel goal-panel" aria-labelledby={headingId}>
+      <div className="section-heading">
+        <p className="eyebrow">Orientation</p>
+        <h2 id={headingId}>Goal and context</h2>
       </div>
-    )}
-    {context === undefined ? (
-      <p className="context-empty">No additional context was supplied.</p>
-    ) : (
-      <div className="context-content">
-        {context.summary === undefined ? null : <p>{context.summary}</p>}
-        {context.entries.length === 0 ? null : (
-          <dl className="context-list">
-            {context.entries.map((entry) => (
-              <div key={entry.label}>
-                <dt>{entry.label}</dt>
-                <dd>{entry.value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </div>
-    )}
-  </section>
-);
+      {goal === undefined ? (
+        <p className="muted">No accepted goal is available.</p>
+      ) : (
+        <div className="goal-content">
+          <h3>{goal.title}</h3>
+          {goal.description === undefined ? null : <p>{goal.description}</p>}
+        </div>
+      )}
+      {context === undefined ? (
+        <p className="context-empty">No additional context was supplied.</p>
+      ) : (
+        <div className="context-content">
+          {context.summary === undefined ? null : <p>{context.summary}</p>}
+          {context.entries.length === 0 ? null : (
+            <dl className="context-list">
+              {context.entries.map((entry) => (
+                <div key={entry.label}>
+                  <dt>{entry.label}</dt>
+                  <dd>{entry.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+      )}
+    </section>
+  );
+};
 
 export interface ProgressSummaryProps {
   readonly progress: ProgressSummaryViewModel;
@@ -249,15 +255,16 @@ export interface ProgressSummaryProps {
 }
 
 export const ProgressSummary = ({ progress, actionMessage }: ProgressSummaryProps) => {
+  const headingId = useScopedId('progress-heading');
   const percentage =
     progress.totalCount === 0
       ? 0
       : Math.round((progress.completedCount / progress.totalCount) * 100);
   return (
-    <section className="panel progress-panel" aria-labelledby="progress-heading">
+    <section className="panel progress-panel" aria-labelledby={headingId}>
       <div className="section-heading compact-heading">
         <p className="eyebrow">Learner progress</p>
-        <h2 id="progress-heading">Your progress</h2>
+        <h2 id={headingId}>Your progress</h2>
       </div>
       <div className="progress-row">
         <strong>{progress.label}</strong>
@@ -299,31 +306,34 @@ export const NextActionCard = ({
   nextAction,
   onSelect,
   disabled = false,
-}: NextActionCardProps) => (
-  <section className="next-action-card" aria-labelledby="next-action-heading">
-    <div>
-      <p className="eyebrow">Suggested next step</p>
-      <h2 id="next-action-heading">
-        {nextAction === undefined ? 'You have reached the end of this plan' : nextAction.title}
-      </h2>
-      {nextAction === undefined ? (
-        <p>All current items are completed by you.</p>
-      ) : nextAction.description === undefined ? null : (
-        <p>{nextAction.description}</p>
+}: NextActionCardProps) => {
+  const headingId = useScopedId('next-action-heading');
+  return (
+    <section className="next-action-card" aria-labelledby={headingId}>
+      <div>
+        <p className="eyebrow">Suggested next step</p>
+        <h2 id={headingId}>
+          {nextAction === undefined ? 'You have reached the end of this plan' : nextAction.title}
+        </h2>
+        {nextAction === undefined ? (
+          <p>All current items are completed by you.</p>
+        ) : nextAction.description === undefined ? null : (
+          <p>{nextAction.description}</p>
+        )}
+      </div>
+      {nextAction === undefined || onSelect === undefined ? null : (
+        <button
+          className="button button-primary"
+          type="button"
+          disabled={disabled}
+          onClick={() => onSelect(nextAction.itemId)}
+        >
+          Open next item <span aria-hidden="true">→</span>
+        </button>
       )}
-    </div>
-    {nextAction === undefined || onSelect === undefined ? null : (
-      <button
-        className="button button-primary"
-        type="button"
-        disabled={disabled}
-        onClick={() => onSelect(nextAction.itemId)}
-      >
-        Open next item <span aria-hidden="true">→</span>
-      </button>
-    )}
-  </section>
-);
+    </section>
+  );
+};
 
 const ProgressBadge = ({ state }: { readonly state?: LearnerProgressState }) =>
   state === undefined ? null : (
@@ -344,17 +354,21 @@ const safeDomId = (value: string): string =>
 
 interface OutlineGroupProps {
   readonly node: OutlineNodeViewModel;
+  readonly idPrefix: string;
+  readonly path: readonly number[];
   readonly focusedItemId?: string;
   readonly onSelectItem?: (itemId: string) => void;
 }
 
 const OutlineGroup = ({
   node,
+  idPrefix,
+  path,
   focusedItemId,
   onSelectItem,
 }: OutlineGroupProps) => {
   const [expanded, setExpanded] = useState(true);
-  const contentId = `outline-${node.kind}-${safeDomId(node.id)}`;
+  const contentId = `${idPrefix}-group-${path.join('-')}-${node.kind}-${safeDomId(node.id)}`;
   return (
     <li className={`outline-group outline-${node.kind}`}>
       <button
@@ -376,6 +390,8 @@ const OutlineGroup = ({
         )}
         <OutlineNodes
           nodes={node.children}
+          idPrefix={idPrefix}
+          path={path}
           {...(focusedItemId === undefined ? {} : { focusedItemId })}
           {...(onSelectItem === undefined ? {} : { onSelectItem })}
         />
@@ -384,17 +400,28 @@ const OutlineGroup = ({
   );
 };
 
+interface OutlineNodesProps {
+  readonly nodes: readonly OutlineNodeViewModel[];
+  readonly idPrefix: string;
+  readonly path: readonly number[];
+  readonly focusedItemId?: string;
+  readonly onSelectItem?: (itemId: string) => void;
+}
+
 const OutlineNodes = ({
   nodes,
+  idPrefix,
+  path,
   focusedItemId,
   onSelectItem,
-}: PlanOutlineProps & { readonly nodes: readonly OutlineNodeViewModel[] }) => (
+}: OutlineNodesProps) => (
   <ul className="outline-list">
-    {nodes.map((node) => {
+    {nodes.map((node, index) => {
+      const nodePath = [...path, index];
       if (node.kind === 'item') {
         const selected = node.id === focusedItemId;
         return (
-          <li className={selected ? 'outline-item current' : 'outline-item'} key={node.id}>
+            <li className={selected ? 'outline-item current' : 'outline-item'} key={`${nodePath.join('-')}-${node.id}`}>
             <button
               type="button"
               className="outline-item-button"
@@ -411,8 +438,10 @@ const OutlineNodes = ({
       }
       return (
         <OutlineGroup
-          key={node.id}
+          key={`${nodePath.join('-')}-${node.id}`}
           node={node}
+          idPrefix={idPrefix}
+          path={nodePath}
           {...(focusedItemId === undefined ? {} : { focusedItemId })}
           {...(onSelectItem === undefined ? {} : { onSelectItem })}
         />
@@ -427,29 +456,34 @@ export const PlanOutline = ({
   onSelectItem,
 }: PlanOutlineProps) => {
   const [expanded, setExpanded] = useState(true);
+  const idPrefix = useScopedId('plan-outline');
+  const headingId = `${idPrefix}-heading`;
+  const contentId = `${idPrefix}-content`;
   return (
-    <section className="panel outline-panel" aria-labelledby="outline-heading">
+    <section className="panel outline-panel" aria-labelledby={headingId}>
       <div className="section-heading outline-heading">
         <div>
           <p className="eyebrow">The path</p>
-          <h2 id="outline-heading">Plan outline</h2>
+          <h2 id={headingId}>Plan outline</h2>
         </div>
         <button
           className="button button-quiet"
           type="button"
           aria-expanded={expanded}
-          aria-controls="plan-outline-content"
+          aria-controls={contentId}
           onClick={() => setExpanded((value) => !value)}
         >
           {expanded ? 'Collapse outline' : 'Expand outline'}
         </button>
       </div>
-      <div id="plan-outline-content" hidden={!expanded}>
+      <div id={contentId} hidden={!expanded}>
         {nodes.length === 0 ? (
           <p className="muted">No accepted outline is available.</p>
         ) : (
           <OutlineNodes
             nodes={nodes}
+            idPrefix={idPrefix}
+            path={[]}
             {...(focusedItemId === undefined ? {} : { focusedItemId })}
             {...(onSelectItem === undefined ? {} : { onSelectItem })}
           />
@@ -463,34 +497,37 @@ export interface ResourceListProps {
   readonly resources: readonly ResourceViewModel[];
 }
 
-export const ResourceList = ({ resources }: ResourceListProps) => (
-  <section className="resources" aria-labelledby="resources-heading">
-    <h3 id="resources-heading">Resources</h3>
-    {resources.length === 0 ? (
-      <p className="muted">No resources supplied.</p>
-    ) : (
-      <ul className="resource-list">
-        {resources.map((resource) => (
-          <li key={resource.resourceId}>
-            {resource.href === undefined ? (
-              <span className="resource-label">{resource.label}</span>
-            ) : (
-              <a href={resource.href} className="resource-link">
-                <span>{resource.label}</span>
-                <span className="resource-arrow" aria-hidden="true">
-                  ↗
-                </span>
-              </a>
-            )}
-            {resource.opaqueReference === undefined ? null : (
-              <span className="resource-reference">Reference supplied by the connected client</span>
-            )}
-          </li>
-        ))}
-      </ul>
-    )}
-  </section>
-);
+export const ResourceList = ({ resources }: ResourceListProps) => {
+  const headingId = useScopedId('resources-heading');
+  return (
+    <section className="resources" aria-labelledby={headingId}>
+      <h3 id={headingId}>Resources</h3>
+      {resources.length === 0 ? (
+        <p className="muted">No resources supplied.</p>
+      ) : (
+        <ul className="resource-list">
+          {resources.map((resource) => (
+            <li key={resource.resourceId}>
+              {resource.href === undefined ? (
+                <span className="resource-label">{resource.label}</span>
+              ) : (
+                <a href={resource.href} className="resource-link">
+                  <span>{resource.label}</span>
+                  <span className="resource-arrow" aria-hidden="true">
+                    ↗
+                  </span>
+                </a>
+              )}
+              {resource.opaqueReference === undefined ? null : (
+                <span className="resource-reference">Reference supplied by the connected client</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+};
 
 export interface LearnerProgressActionProps {
   readonly action: LearnerActionViewModel;
@@ -500,64 +537,75 @@ export interface LearnerProgressActionProps {
 export const LearnerProgressAction = ({
   action,
   onAction,
-}: LearnerProgressActionProps) => (
-  <div className="learner-action">
-    <button
-      className={action.kind === 'undo_completion' ? 'button button-secondary' : 'button button-primary'}
-      type="button"
-      disabled={!action.enabled || onAction === undefined}
-      aria-describedby="learner-action-status"
-      onClick={() => onAction?.()}
-    >
-      {action.label}
-    </button>
-    <p id="learner-action-status" className="action-status" role="status" aria-live="polite">
-      {action.state === 'submitting'
-        ? 'This action is being submitted.'
-        : action.state === 'confirmed'
-          ? 'Your confirmed progress is up to date.'
-          : action.disabledReason ?? ''}
-    </p>
-  </div>
-);
+}: LearnerProgressActionProps) => {
+  const statusId = useScopedId('learner-action-status');
+  return (
+    <div className="learner-action">
+      <button
+        className={action.kind === 'undo_completion' ? 'button button-secondary' : 'button button-primary'}
+        type="button"
+        disabled={!action.enabled || onAction === undefined}
+        aria-describedby={statusId}
+        onClick={() => onAction?.()}
+      >
+        {action.label}
+      </button>
+      <p id={statusId} className="action-status" role="status" aria-live="polite">
+        {action.state === 'submitting'
+          ? 'This action is being submitted.'
+          : action.state === 'confirmed'
+            ? 'Your confirmed progress is up to date.'
+            : action.disabledReason ?? ''}
+      </p>
+    </div>
+  );
+};
 
 export interface PlanItemDetailProps {
   readonly item?: PlanItemViewModel;
   readonly onProgressAction?: (itemId: string, action: LearnerActionKind) => void;
 }
 
-export const PlanItemDetail = ({ item, onProgressAction }: PlanItemDetailProps) => (
-  <section className="panel focused-panel" aria-labelledby="focused-item-heading" tabIndex={-1}>
-    <div className="section-heading">
-      <p className="eyebrow">Focused item</p>
-      <h2 id="focused-item-heading">{item === undefined ? 'No item selected' : item.title}</h2>
-    </div>
-    {item === undefined ? (
-      <p className="muted">Select an item from the outline to inspect it here.</p>
-    ) : (
-      <>
-        <div className="focused-meta">
-          <span>{item.positionLabel}</span>
-          <span className={`status-text status-${item.progressState}`}>
-            {progressLabel(item.progressState)}
-          </span>
-        </div>
-        {item.description === undefined ? (
-          <p className="context-empty">No description was supplied for this item.</p>
-        ) : (
-          <p className="focused-description">{item.description}</p>
-        )}
-        <LearnerProgressAction
-          action={item.action}
-          {...(onProgressAction === undefined
-            ? {}
-            : { onAction: () => onProgressAction(item.itemId, item.action.kind) })}
-        />
-        <ResourceList resources={item.resources} />
-      </>
-    )}
-  </section>
-);
+export const PlanItemDetail = ({ item, onProgressAction }: PlanItemDetailProps) => {
+  const headingId = useScopedId('focused-item-heading');
+  return (
+    <section
+      className="panel focused-panel"
+      aria-labelledby={headingId}
+      data-focus-target="focused-item"
+      tabIndex={-1}
+    >
+      <div className="section-heading">
+        <p className="eyebrow">Focused item</p>
+        <h2 id={headingId}>{item === undefined ? 'No item selected' : item.title}</h2>
+      </div>
+      {item === undefined ? (
+        <p className="muted">Select an item from the outline to inspect it here.</p>
+      ) : (
+        <>
+          <div className="focused-meta">
+            <span>{item.positionLabel}</span>
+            <span className={`status-text status-${item.progressState}`}>
+              {progressLabel(item.progressState)}
+            </span>
+          </div>
+          {item.description === undefined ? (
+            <p className="context-empty">No description was supplied for this item.</p>
+          ) : (
+            <p className="focused-description">{item.description}</p>
+          )}
+          <LearnerProgressAction
+            action={item.action}
+            {...(onProgressAction === undefined
+              ? {}
+              : { onAction: () => onProgressAction(item.itemId, item.action.kind) })}
+          />
+          <ResourceList resources={item.resources} />
+        </>
+      )}
+    </section>
+  );
+};
 
 const personalizationStateLabel = (
   state: PersonalizationConsentViewState,
@@ -615,10 +663,19 @@ export const PersonalizationPanel = ({
   onAcceptProposal,
   onRejectProposal,
 }: PersonalizationPanelProps) => {
+  const panelId = useScopedId('personalization');
+  const headingId = `${panelId}-heading`;
+  const feedbackHeadingId = `${panelId}-feedback-heading`;
+  const feedbackAreaId = `${panelId}-feedback-area`;
+  const feedbackValueId = `${panelId}-feedback-value`;
+  const recordsHeadingId = `${panelId}-feedback-records-heading`;
+  const proposalsHeadingId = `${panelId}-proposal-heading`;
   const firstArea = model.feedbackAreas[0]?.area ?? 'difficulty';
   const [area, setArea] = useState<PersonalizationFeedbackAreaView>(firstArea);
   const [value, setValue] = useState('');
   const [corrections, setCorrections] = useState<Readonly<Record<string, string>>>({});
+  const statusRef = useRef<HTMLParagraphElement>(null);
+  const previousStateRef = useRef(model.state);
   const selectedArea =
     model.feedbackAreas.find((entry) => entry.area === area) ?? model.feedbackAreas[0];
 
@@ -626,17 +683,31 @@ export const PersonalizationPanel = ({
     setValue(selectedArea?.options[0]?.value ?? '');
   }, [selectedArea?.area]);
 
+  useEffect(() => {
+    if (previousStateRef.current !== model.state) {
+      statusRef.current?.focus();
+    }
+    previousStateRef.current = model.state;
+  }, [model.state]);
+
   const isEnabled = model.state === 'enabled';
   const isPaused = model.state === 'paused';
   const isOff = model.state === 'disabled' || model.state === 'revoked';
 
   return (
-    <section className="panel personalization-panel" aria-labelledby="personalization-heading">
+    <section className="panel personalization-panel" aria-labelledby={headingId}>
       <div className="section-heading compact-heading">
         <p className="eyebrow">Learner control</p>
-        <h2 id="personalization-heading">Suggestions and feedback</h2>
+        <h2 id={headingId}>Suggestions and feedback</h2>
       </div>
-      <p className="control-status" role="status" aria-live="polite">
+      <p
+        ref={statusRef}
+        className="control-status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        tabIndex={-1}
+      >
         {personalizationStateLabel(model.state)} · {model.scopeLabel}
       </p>
       <p>{model.explanation}</p>
@@ -663,21 +734,21 @@ export const PersonalizationPanel = ({
       )}
 
       {model.statusMessage === undefined ? null : (
-        <p className="live-note" role="status" aria-live="polite">
+        <p className="live-note" role="status" aria-live="polite" aria-atomic="true">
           {model.statusMessage}
         </p>
       )}
 
       {isEnabled && onRecordFeedback !== undefined ? (
-        <div className="personalization-feedback-form" aria-labelledby="feedback-heading">
-          <h3 id="feedback-heading">Tell us how this plan feels</h3>
+        <div className="personalization-feedback-form" role="group" aria-labelledby={feedbackHeadingId}>
+          <h3 id={feedbackHeadingId}>Tell us how this plan feels</h3>
           {model.feedbackTargetLabel === undefined ? null : (
             <p className="muted">For {model.feedbackTargetLabel}</p>
           )}
           <div className="form-row">
-            <label htmlFor="feedback-area">Area</label>
+            <label htmlFor={feedbackAreaId}>Area</label>
             <select
-              id="feedback-area"
+              id={feedbackAreaId}
               value={area}
               onChange={(event) => setArea(event.target.value as PersonalizationFeedbackAreaView)}
             >
@@ -689,9 +760,9 @@ export const PersonalizationPanel = ({
             </select>
           </div>
           <div className="form-row">
-            <label htmlFor="feedback-value">Your feedback</label>
+            <label htmlFor={feedbackValueId}>Your feedback</label>
             <select
-              id="feedback-value"
+              id={feedbackValueId}
               value={value}
               onChange={(event) => setValue(event.target.value)}
             >
@@ -715,8 +786,8 @@ export const PersonalizationPanel = ({
       ) : null}
 
       {model.feedback.length === 0 ? null : (
-        <div className="personalization-records" aria-labelledby="feedback-records-heading">
-          <h3 id="feedback-records-heading">Your saved feedback</h3>
+        <div className="personalization-records" aria-labelledby={recordsHeadingId}>
+          <h3 id={recordsHeadingId}>Your saved feedback</h3>
           <ul className="personalization-list">
             {model.feedback.map((feedback) => (
               <li key={feedback.feedbackId}>
@@ -727,11 +798,11 @@ export const PersonalizationPanel = ({
                 </div>
                 {feedback.status === 'active' ? (
                   <div className="personalization-row-actions">
-                    <label className="visually-hidden" htmlFor={`correct-${feedback.feedbackId}`}>
+                    <label className="visually-hidden" htmlFor={`${panelId}-correct-${feedback.feedbackId}`}>
                       Correct {feedback.areaLabel} feedback
                     </label>
                     <select
-                      id={`correct-${feedback.feedbackId}`}
+                      id={`${panelId}-correct-${feedback.feedbackId}`}
                       value={corrections[feedback.feedbackId] ?? ''}
                       onChange={(event) =>
                         setCorrections((current) => ({
@@ -776,8 +847,8 @@ export const PersonalizationPanel = ({
       )}
 
       {model.proposals.length === 0 ? null : (
-        <div className="personalization-proposals" aria-labelledby="proposal-heading">
-          <h3 id="proposal-heading">Suggestions to review</h3>
+        <div className="personalization-proposals" aria-labelledby={proposalsHeadingId}>
+          <h3 id={proposalsHeadingId}>Suggestions to review</h3>
           <ul className="personalization-list">
             {model.proposals.map((proposal) => (
               <li key={proposal.proposalId}>
@@ -849,6 +920,10 @@ export const PlanDataControls = ({
   onRetryDelete,
   onRefresh,
 }: PlanDataControlsProps) => {
+  const controlsId = useScopedId('data-controls');
+  const headingId = `${controlsId}-heading`;
+  const confirmationId = `${controlsId}-confirmation`;
+  const confirmationHeadingId = `${controlsId}-confirmation-heading`;
   const [confirming, setConfirming] = useState(controls.deletion.state === 'confirming');
   const triggerRef = useRef<HTMLButtonElement>(null);
   const keepRef = useRef<HTMLButtonElement>(null);
@@ -877,10 +952,10 @@ export const PlanDataControls = ({
   const canConfirm = controls.deletion.enabled && controls.deletion.state === 'available';
 
   return (
-    <section className="panel data-controls" aria-labelledby="data-controls-heading">
+    <section className="panel data-controls" aria-labelledby={headingId}>
       <div className="section-heading compact-heading">
         <p className="eyebrow">Data controls</p>
-        <h2 id="data-controls-heading">Plan data</h2>
+        <h2 id={headingId}>Plan data</h2>
       </div>
       <p className="muted">Delete this accepted plan and its learner progress from your workspace.</p>
       {status === undefined ? null : (
@@ -894,7 +969,7 @@ export const PlanDataControls = ({
         type="button"
         disabled={!canConfirm}
         aria-expanded={confirming}
-        aria-controls="delete-plan-confirmation"
+        aria-controls={confirmationId}
         onClick={() => setConfirming(true)}
       >
         {controls.deletion.label}
@@ -914,8 +989,13 @@ export const PlanDataControls = ({
         ) : null
       )}
       {confirming ? (
-        <div className="confirmation" id="delete-plan-confirmation">
-          <h3>Delete this plan?</h3>
+        <div
+          className="confirmation"
+          id={confirmationId}
+          role="group"
+          aria-labelledby={confirmationHeadingId}
+        >
+          <h3 id={confirmationHeadingId}>Delete this plan?</h3>
           <p>
             {controls.deletion.consequence ??
               'This action is irreversible. The accepted plan and learner progress will be purged within 24 hours.'}
@@ -994,15 +1074,18 @@ export interface EmptyStateProps {
   readonly message: string;
 }
 
-export const EmptyState = ({ title, message }: EmptyStateProps) => (
-  <section className="panel state-panel empty-panel" aria-labelledby="empty-heading">
-    <span className="empty-icon" aria-hidden="true">
-      ◌
-    </span>
-    <h2 id="empty-heading">{title}</h2>
-    <p>{message}</p>
-  </section>
-);
+export const EmptyState = ({ title, message }: EmptyStateProps) => {
+  const headingId = useScopedId('empty-heading');
+  return (
+    <section className="panel state-panel empty-panel" aria-labelledby={headingId}>
+      <span className="empty-icon" aria-hidden="true">
+        ◌
+      </span>
+      <h2 id={headingId}>{title}</h2>
+      <p>{message}</p>
+    </section>
+  );
+};
 
 export interface RecoveryPanelProps {
   readonly title: string;
@@ -1016,22 +1099,25 @@ export const RecoveryPanel = ({
   message,
   actionLabel,
   onAction,
-}: RecoveryPanelProps) => (
-  <section className="panel state-panel recovery-panel" role="alert" aria-labelledby="recovery-heading">
-    <span className="recovery-icon" aria-hidden="true">
-      !
-    </span>
-    <div>
-      <h2 id="recovery-heading">{title}</h2>
-      <p>{message}</p>
-      {actionLabel === undefined || onAction === undefined ? null : (
-        <button className="button button-secondary" type="button" onClick={onAction}>
-          {actionLabel}
-        </button>
-      )}
-    </div>
-  </section>
-);
+}: RecoveryPanelProps) => {
+  const headingId = useScopedId('recovery-heading');
+  return (
+    <section className="panel state-panel recovery-panel" role="alert" aria-labelledby={headingId}>
+      <span className="recovery-icon" aria-hidden="true">
+        !
+      </span>
+      <div>
+        <h2 id={headingId}>{title}</h2>
+        <p>{message}</p>
+        {actionLabel === undefined || onAction === undefined ? null : (
+          <button className="button button-secondary" type="button" onClick={onAction}>
+            {actionLabel}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+};
 
 export interface PlanCollectionProps {
   readonly model: PlanListViewModel;

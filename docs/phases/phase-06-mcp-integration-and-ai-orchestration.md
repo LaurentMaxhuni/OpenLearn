@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned
+Local slice
 
 ## Objective
 
@@ -10,13 +10,13 @@ Implement the selected MCP connection boundary and safely transform AI-generated
 
 ## Implemented first increment (2026-08-31)
 
-The approved first implementation slice is now present on the Phase 6 branch and covered by deterministic tests:
+The approved first implementation slice is present in the repository and covered by deterministic tests:
 
 - `@openlearn/application` defines framework-neutral actor capabilities, operation lifecycle ports, request fingerprints, idempotent mutation handling, cancellation, recovery leases, fencing metadata, safe failures, and accepted-plan/progress use cases. Its in-memory state adapter is test-only.
 - `@openlearn/mcp` uses the official MCP TypeScript SDK. It registers the exact three Phase 6 tools, filters discovery by the supplied actor scopes, validates strict protocol inputs, and maps safe application results into the `openlearn.phase6.v1` structured envelope and concise text content. Stdio and Streamable HTTP transport factories are available; legacy HTTP+SSE is not introduced.
 - `apps/service` composes Fastify health endpoints and stateless Streamable HTTP handling. It validates controlled origins and authenticates HTTP requests before constructing an actor-bound MCP server. Local stdio startup requires an explicit authenticator and keeps diagnostics on `stderr`.
 
-The full workspace verification passes on the available runtime. Phase 6 remains `Planned`/`Next` because this increment does not claim a production persistence adapter, configured identity provider, durable MCP session store, deployment configuration, provider/model SDK, prompt interpretation, or a complete protocol-client compatibility matrix.
+The full workspace verification passes on the available runtime. Phase 6 is a `Local slice`: this increment does not claim a production persistence adapter, configured identity provider, durable MCP session store, deployment configuration, provider/model SDK, prompt interpretation, or a complete protocol-client compatibility matrix. Those hosted concerns remain in Phase 10.
 
 ## Why this phase matters
 

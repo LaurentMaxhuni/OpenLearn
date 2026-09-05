@@ -2,11 +2,11 @@
 
 **Status:** Accepted for implementation
 
-**Availability:** Planned. This document records the technical baseline; the dashboard, service, persistence, and MCP integration are not implemented in the current repository.
+**Availability:** Local implementation available. This document records the technical baseline; production persistence, identity, provider, telemetry, and deployment adapters remain deferred.
 
 ## Purpose
 
-OpenLearn is a standalone dashboard and reusable component surface that an external AI client can use through MCP. The external AI client interprets the learner's request and supplies or revises plan-shaped content. OpenLearn validates that input, stores accepted plan and progress state, and maps it onto OpenLearn-owned components.
+OpenLearn is a standalone dashboard and reusable component surface that an external AI client can use through MCP. The external AI client interprets the learner's request and supplies or revises plan-shaped content. OpenLearn validates that input, coordinates accepted plan and progress state, and maps it onto OpenLearn-owned components. The repository currently provides deterministic local adapters and tests; hosted state and identity adapters remain separate work.
 
 The architecture keeps four concerns separate:
 
@@ -79,7 +79,7 @@ The domain package imports none of the UI, HTTP, MCP, database, or identity-prov
 
 ## Logical workspace layout
 
-The initial scaffold should use these package responsibilities:
+The workspace uses these package responsibilities:
 
 ```text
 apps/
@@ -199,7 +199,7 @@ No environment depends on an undocumented global database, provider account, or 
 
 ## Local development and verification contract
 
-The current repository has no runtime, package manifest, or executable test suite. When the scaffold is added, it must provide:
+The current repository provides the following local verification contract:
 
 ```text
 pnpm install --frozen-lockfile
@@ -211,7 +211,7 @@ pnpm build
 pnpm verify
 ```
 
-The scaffold must also document the local PostgreSQL dependency, migration/reset command, fixture loading, test identity setup, and the stdio MCP smoke-test command. Verification must run without a live AI provider and must cover contract-shaped fixtures, application state transitions, UI states, and MCP adapter behavior.
+The repository also documents the future PostgreSQL dependency, migration/reset command, fixture loading, test identity setup, and stdio MCP smoke-test boundary as production-adapter work. Verification runs without a live AI provider and covers contract-shaped fixtures, application state transitions, UI states, and MCP adapter behavior.
 
 ## Deliberately deferred
 

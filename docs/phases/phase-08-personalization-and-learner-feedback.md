@@ -2,11 +2,20 @@
 
 ## Status
 
-Planned
+Local slice
 
 ## Objective
 
 Define how learner progress and explicit feedback may inform plan adjustments, recommendations, pacing, and context-aware next steps while preserving learner agency.
+
+## Implemented local slice (2026-09-05)
+
+- `@openlearn/application` defines explicit consent, pause, revoke, bounded feedback, correction/deletion, deterministic proposal review, and opaque revision handoff contracts.
+- `@openlearn/domain` enforces owner/plan scope, lifecycle, consent epochs, proposal expiry, compare-and-set decisions, and purge behavior.
+- The dashboard provides learner-readable controls, feedback correction/deletion, suggestion review, and a validating browser-local adapter that starts disabled.
+- Personalization journey, CAS-conflict, deletion, retention, and no-raw-feedback telemetry tests pass in the Phase 9 verification record.
+
+The slice records learner intent only; it never mutates accepted plan content or confirmed progress. Live AI evaluation, server persistence, telemetry sinks, and hosted identity remain Phase 10 work.
 
 ## Why this phase matters
 
