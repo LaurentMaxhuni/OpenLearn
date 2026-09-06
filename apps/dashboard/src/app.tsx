@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { PlanView } from '@openlearn/application';
 import {
   changePersonalizationConsent,
   correctLearnerFeedback,
@@ -47,6 +48,11 @@ import {
   toPlanListViewModel,
 } from './view-model.js';
 import { routeForPath } from './router.js';
+import {
+  createDashboardApiClient,
+  DashboardApiError,
+  type DashboardApiClient,
+} from './remote-api.js';
 
 export { routeForPath } from './router.js';
 
@@ -157,10 +163,16 @@ const PlansPage = ({
   preview,
   snapshots,
   onNavigate,
+  connected = false,
+  pageState,
+  pageMessage,
 }: {
   readonly preview: StaticPreviewState;
   readonly snapshots: readonly AcceptedPlanSnapshotInput[];
   readonly onNavigate: (href: string) => void;
+  readonly connected?: boolean;
+  readonly pageState?: 'loading' | 'ready' | 'error';
+  readonly pageMessage?: string;
 }) => {
   const entries = useMemo(
     () =>
@@ -174,17 +186,25 @@ const PlansPage = ({
     [preview, snapshots],
   );
   const model =
-    preview === 'empty'
-      ? toPlanListViewModel([])
-      : preview === 'loading'
-        ? { pageState: 'loading' as const, plans: [] }
-        : preview === 'retryable'
-          ? {
-              pageState: 'error' as const,
-              pageMessage: 'Try again or refresh when you are ready.',
-              plans: [],
-            }
-          : toPlanListViewModel(entries);
+    pageState === 'loading'
+      ? { pageState: 'loading' as const, plans: [] }
+      : pageState === 'error'
+        ? {
+            pageState: 'error' as const,
+            pageMessage: pageMessage ?? 'Try again or refresh when you are ready.',
+            plans: [],
+          }
+        : preview === 'empty'
+          ? toPlanListViewModel([])
+          : preview === 'loading'
+            ? { pageState: 'loading' as const, plans: [] }
+            : preview === 'retryable'
+              ? {
+                  pageState: 'error' as const,
+                  pageMessage: 'Try again or refresh when you are ready.',
+                  plans: [],
+                }
+              : toPlanListViewModel(entries);
 
   return (
     <>
@@ -193,7 +213,13 @@ const PlansPage = ({
         title="Learning plans"
         description="A clear place to return to the learning paths you have accepted."
       />
-      <StaticNotice state={preview} />
+      {connected ? (
+        <p className="static-notice" role="note">
+          Connected dashboard · authenticated service data is shown for this workspace.
+        </p>
+      ) : (
+        <StaticNotice state={preview} />
+      )}
       <PlanCollection model={model} onNavigate={onNavigate} />
     </>
   );
@@ -241,6 +267,7 @@ const DetailPage = ({
   onDeleteFeedback,
   onAcceptProposal,
   onRejectProposal,
+  connected = false,
 }: {
   readonly planId: string;
   readonly preview: StaticPreviewState;
@@ -270,6 +297,7 @@ const DetailPage = ({
   readonly onDeleteFeedback: (feedbackId: string) => void;
   readonly onAcceptProposal: (proposalId: string, proposalVersion: number) => void;
   readonly onRejectProposal: (proposalId: string, proposalVersion: number) => void;
+  readonly connected?: boolean;
 }) => {
   if (preview === 'loading') {
     return (
@@ -341,7 +369,13 @@ const DetailPage = ({
         backHref="/plans"
         onNavigate={onNavigate}
       />
-      <StaticNotice state={preview} />
+      {connected ? (
+        <p className="static-notice" role="note">
+          Connected dashboard · progress is saved by the authenticated service.
+        </p>
+      ) : (
+        <StaticNotice state={preview} />
+      )}
       <DashboardDetail
         model={detail}
         onSelectItem={onSelectItem}
@@ -363,7 +397,7 @@ const DetailPage = ({
   );
 };
 
-export const App = () => {
+const StaticDashboard = () => {
   const progressStore = useMemo(
     () => createProgressStore(browserStorage()),
     [],
@@ -880,3 +914,269 @@ export const App = () => {
     </AppShell>
   );
 };
+
+const snapshotFromView = (view: PlanView): AcceptedPlanSnapshotInput => ({
+  planId: view.planId,
+  revisionId: view.revisionId,
+  revisionNumber: view.revisionNumber,
+  acceptedAt: view.acceptedAt,
+  content: view.content,
+  missingOptionalPaths: view.missingOptionalPaths,
+  currentProgress: view.currentProgress,
+  progressSummary: view.progressSummary,
+  ...(view.nextItemId === undefined ? {} : { nextItemId: view.nextItemId }),
+});
+
+const connectedOperationKey = (kind: string): string => {
+  const randomId =
+    typeof globalThis.crypto?.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return `dashboard-${kind}-${randomId}`.slice(0, 128);
+};
+
+const ConnectedDashboard = () => {
+  const client = useMemo<DashboardApiClient>(
+      () =>
+        createDashboardApiClient({
+        ...(import.meta.env.VITE_OPENLEARN_SERVICE_ORIGIN === undefined
+          ? {}
+          : { origin: import.meta.env.VITE_OPENLEARN_SERVICE_ORIGIN }),
+      }),
+    [],
+  );
+  const [snapshots, setSnapshots] = useState<readonly AcceptedPlanSnapshotInput[]>([]);
+  const [pageState, setPageState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [pageMessage, setPageMessage] = useState<string | undefined>();
+  const [pathname, setPathname] = useState(() => window.location.pathname);
+  const [focusedItemId, setFocusedItemId] = useState<string | undefined>();
+  const [actionStatesByPlan, setActionStatesByPlan] = useState<ActionStatesByPlan>({});
+  const [deletionState, setDeletionState] = useState<DeletionState>('available');
+  const [progressMessages, setProgressMessages] = useState<Readonly<Record<string, string>>>({});
+  const hasNavigatedRef = useRef(false);
+
+  const snapshotsById = useMemo(
+    () => new Map(snapshots.map((snapshot) => [snapshot.planId, snapshot])),
+    [snapshots],
+  );
+
+  const load = async (): Promise<void> => {
+    setPageState('loading');
+    try {
+      const views = await client.listPlanViews();
+      setSnapshots(views.map(snapshotFromView));
+      setPageState('ready');
+      setPageMessage(undefined);
+      setActionStatesByPlan({});
+      setProgressMessages({});
+      setDeletionState('available');
+    } catch (error) {
+      setPageState('error');
+      setPageMessage(
+        error instanceof DashboardApiError
+          ? error.message
+          : 'The connected dashboard is unavailable. Try again when ready.',
+      );
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, [client]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      hasNavigatedRef.current = true;
+      setPathname(window.location.pathname);
+      setFocusedItemId(undefined);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (!hasNavigatedRef.current) return;
+    document.getElementById('main-content')?.focus({ preventScroll: true });
+  }, [pathname]);
+
+  const navigate = (href: string) => {
+    hasNavigatedRef.current = true;
+    window.history.pushState({}, '', href);
+    setPathname(window.location.pathname);
+    setFocusedItemId(undefined);
+  };
+  const route = routeForPath(pathname);
+  const selectedPlanId = route.kind === 'plan' ? route.planId : undefined;
+  const selectedSnapshot =
+    selectedPlanId === undefined ? undefined : snapshotsById.get(selectedPlanId);
+
+  const selectItem = (itemId: string) => setFocusedItemId(itemId);
+
+  useEffect(() => {
+    if (focusedItemId === undefined) return;
+    const target = document.querySelector<HTMLElement>(
+      '[data-focus-target="focused-item"]',
+    );
+    if (target === null) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
+      block: 'start',
+    });
+  }, [focusedItemId]);
+
+  const progressAction = async (
+    itemId: string,
+    action: LearnerActionKind,
+  ): Promise<void> => {
+    if (selectedPlanId === undefined) return;
+    const snapshot = snapshotsById.get(selectedPlanId);
+    if (snapshot === undefined) return;
+    const currentProgress = snapshot.currentProgress.find(
+      (record) => record.itemId === itemId,
+    );
+    const apiAction =
+      action === 'start'
+        ? 'start_item'
+        : action === 'complete'
+          ? 'complete_item'
+          : 'undo_completion';
+    setActionStatesByPlan((states) =>
+      setActionState(states, selectedPlanId, itemId, 'submitting'),
+    );
+    try {
+      await client.applyProgressAction({
+        planId: snapshot.planId,
+        itemId,
+        action: apiAction,
+        expectedRevisionId: snapshot.revisionId,
+        expectedProgressVersion: currentProgress?.progressVersion ?? 0,
+        idempotencyKey: connectedOperationKey('progress'),
+        confirmedAt: new Date().toISOString(),
+      });
+      const updated = snapshotFromView(await client.getPlanView(snapshot.planId));
+      setSnapshots((current) =>
+        current.map((entry) => (entry.planId === updated.planId ? updated : entry)),
+      );
+      setActionStatesByPlan((states) =>
+        setActionState(states, selectedPlanId, itemId, 'available'),
+      );
+      setProgressMessages((messages) => ({
+        ...messages,
+        [selectedPlanId]: 'Confirmed progress was saved by the service.',
+      }));
+    } catch (error) {
+      const conflict = error instanceof DashboardApiError && error.status === 409;
+      setActionStatesByPlan((states) =>
+        setActionState(
+          states,
+          selectedPlanId,
+          itemId,
+          conflict ? 'conflict' : 'failed_retryable',
+        ),
+      );
+      setProgressMessages((messages) => ({
+        ...messages,
+        [selectedPlanId]:
+          error instanceof DashboardApiError
+            ? error.message
+            : 'Progress could not be saved. Try again when ready.',
+      }));
+    }
+  };
+
+  const confirmDelete = async (): Promise<void> => {
+    if (selectedPlanId === undefined) return;
+    const snapshot = snapshotsById.get(selectedPlanId);
+    if (snapshot === undefined) return;
+    setDeletionState('submitting');
+    try {
+      await client.deletePlan({
+        planId: snapshot.planId,
+        expectedRevisionId: snapshot.revisionId,
+        idempotencyKey: connectedOperationKey('delete'),
+        deletedAt: new Date().toISOString(),
+      });
+      setDeletionState('deleted');
+      setSnapshots((current) => current.filter((entry) => entry.planId !== snapshot.planId));
+      navigate('/plans');
+    } catch (error) {
+      setDeletionState(
+        error instanceof DashboardApiError && error.status === 409
+          ? 'conflict'
+          : 'failed_retryable',
+      );
+    }
+  };
+
+  const refresh = () => {
+    void load();
+  };
+
+  return (
+    <AppShell currentPath={route.kind === 'plans' ? '/plans' : ''} onNavigate={navigate}>
+      <main id="main-content" className="page-main" tabIndex={-1}>
+        {route.kind === 'unknown' ? (
+          <UnavailablePage onNavigate={navigate} />
+        ) : route.kind === 'plans' ? (
+          <PlansPage
+            preview="accepted"
+            snapshots={snapshots}
+            onNavigate={navigate}
+            connected
+            pageState={pageState}
+            {...(pageMessage === undefined ? {} : { pageMessage })}
+          />
+        ) : pageState === 'loading' && selectedSnapshot === undefined ? (
+          <>
+            <PageHeader title="Loading plan" backHref="/plans" onNavigate={navigate} />
+            <LoadingState label="Loading your accepted plan…" />
+          </>
+        ) : selectedSnapshot === undefined ? (
+          <UnavailablePage onNavigate={navigate} />
+        ) : (
+          <DetailPage
+            planId={selectedSnapshot.planId}
+            preview="accepted"
+            snapshotsById={snapshotsById}
+            {...(focusedItemId === undefined ? {} : { focusedItemId })}
+            actionStates={actionStatesForPlan(actionStatesByPlan, selectedSnapshot.planId)}
+            deletionState={deletionState}
+            {...(progressMessages[selectedSnapshot.planId] === undefined
+              ? {}
+              : { progressMessage: progressMessages[selectedSnapshot.planId] })}
+            connected
+            onNavigate={navigate}
+            onSelectItem={selectItem}
+            onProgressAction={(itemId, action) => void progressAction(itemId, action)}
+            onConfirmDelete={() => void confirmDelete()}
+            onRetryDelete={() => setDeletionState('available')}
+            onRefresh={refresh}
+            onEnablePersonalization={() => undefined}
+            onPausePersonalization={() => undefined}
+            onResumePersonalization={() => undefined}
+            onDisablePersonalization={() => undefined}
+            onRecordFeedback={() => undefined}
+            onCorrectFeedback={() => undefined}
+            onDeleteFeedback={() => undefined}
+            onAcceptProposal={() => undefined}
+            onRejectProposal={() => undefined}
+          />
+        )}
+        <footer className="page-footer">
+          <span>OpenLearn connected dashboard</span>
+          <span>Authenticated service data · server-side progress and deletion</span>
+        </footer>
+      </main>
+    </AppShell>
+  );
+};
+
+export const App = () =>
+  import.meta.env.VITE_OPENLEARN_MODE === 'connected' ? (
+    <ConnectedDashboard />
+  ) : (
+    <StaticDashboard />
+  );

@@ -15,7 +15,7 @@ Allow learners to manage permitted plan items and persist meaningful progress th
 - The dashboard exposes learner-readable action status, next-item navigation, focus targets, and a validating browser-local progress adapter for deterministic preview use.
 - Journey, stale-state, storage-failure, and accepted-plan-preservation tests pass in the Phase 9 verification record.
 
-The slice is intentionally not a hosted persistence implementation. PostgreSQL transactions, authenticated server reads, cross-instance recovery, and deployment operations remain Phase 10 work.
+The slice was intentionally introduced with a browser-local adapter. The Phase 10 baseline now supplies PostgreSQL transactions, authenticated server reads, cross-instance recovery, connected dashboard actions, and deployment operations while preserving the same domain transitions.
 
 ## Why this phase matters
 

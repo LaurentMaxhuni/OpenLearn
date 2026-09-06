@@ -74,6 +74,7 @@ export interface AcceptedPlanSnapshotInput {
   readonly currentProgress: readonly {
     readonly itemId: string;
     readonly state: LearnerProgressState;
+    readonly progressVersion: number;
   }[];
   readonly progressSummary: {
     readonly totalCount: number;

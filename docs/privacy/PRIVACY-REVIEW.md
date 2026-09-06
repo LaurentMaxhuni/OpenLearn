@@ -1,7 +1,7 @@
 # OpenLearn Phase 9 privacy and retention review
 
 **Review date:** 2026-09-05
-**Scope:** Current Phase 7 progress and Phase 8 personalization slices, application telemetry contracts, and browser-local adapters.
+**Scope:** Current Phase 7/8 domain contracts, Phase 10 PostgreSQL and identity adapters, service telemetry, and browser-local preview adapters.
 **Status:** Reviewed for the current implementation; deployment-specific legal and operational review remains required.
 
 ## Allowed data
@@ -31,17 +31,17 @@ The Phase 2 baseline remains authoritative:
 
 | Category | Window | Current evidence |
 | --- | --- | --- |
-| Primary plan, revision, progress, and personalization purge | Within 24 hours of deletion | `packages/domain/src/retention.ts`, deletion/personalization transitions |
+| Primary plan, revision, progress, and personalization purge | Within 24 hours of deletion | `packages/domain/src/retention.ts`, `packages/persistence/src/postgres-state.ts`, deletion/personalization transitions |
 | Full operation details and replay response details | 24 hours after terminal/expired state | `packages/domain/src/retention.ts` |
 | Redacted operational telemetry | 30 days | `packages/domain/src/retention.ts`, `TelemetryEvent` contract |
 | Minimal security/ownership audit metadata | 90 days | `packages/domain/src/retention.ts` |
 | Backups and deletion tombstone protection after account deletion | 35 days | `packages/domain/src/retention.ts`, retention tests |
 
-Retention functions calculate deadlines; they do not claim to delete data. A production adapter must execute purge jobs, replay deletion tombstones on restore, and prove that logs and backups follow these windows.
+Retention functions calculate deadlines and the PostgreSQL adapter exposes the bounded purge/reconciliation sweep. A selected deployment must schedule the job, replay deletion tombstones on restore, and prove that logs and backups follow these windows.
 
 ## Browser-local limitation
 
-The static dashboard stores minimal records in versioned `localStorage` keys for deterministic preview behavior. Hydration rejects malformed, foreign, and cross-plan records, but browser storage remains user-controlled and is not suitable as the hosted source of truth. Production use requires an authenticated server adapter with the same domain/application transitions and retention behavior.
+The static dashboard stores minimal records in versioned `localStorage` keys for deterministic preview behavior. Hydration rejects malformed, foreign, and cross-plan records, but browser storage remains user-controlled and is not suitable as the hosted source of truth. Connected mode uses the authenticated service and PostgreSQL adapter for plan, progress, and deletion state; hosted personalization endpoints remain a follow-up increment.
 
 ## Review conclusion
 

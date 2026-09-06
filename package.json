@@ -7,11 +7,13 @@
   },
   "scripts": {
     "build": "pnpm --recursive run build",
-    "build:packages": "pnpm --filter @openlearn/domain run build && pnpm --filter @openlearn/application run build && pnpm --filter @openlearn/mcp run build",
+    "build:packages": "pnpm --filter @openlearn/domain run build && pnpm --filter @openlearn/application run build && pnpm --filter @openlearn/identity run build && pnpm --filter @openlearn/persistence run build && pnpm --filter @openlearn/mcp run build",
     "lint": "node scripts/quality-gates.mjs source",
     "typecheck": "pnpm run build:packages && pnpm --recursive run typecheck",
     "test": "pnpm --recursive run test",
-    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run release:check",
+    "db:migrate": "pnpm --filter @openlearn/service run build && pnpm --filter @openlearn/service run migrate",
+    "release:check": "node scripts/release-check.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.2"

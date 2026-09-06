@@ -1,7 +1,7 @@
 # OpenLearn Phase 9 security review
 
 **Review date:** 2026-09-05
-**Status:** Complete for the local implementation; standard scan evidence is recorded below with its coverage limitation.
+**Status:** Complete for the repository baseline; deployment-specific certification remains operator-owned.
 **Review owner:** OpenLearn maintainers
 
 ## Reviewed controls
@@ -18,9 +18,9 @@
 
 | ID | Severity | Disposition | Owner | Evidence |
 | --- | --- | --- | --- | --- |
-| OL-SEC-001 | Informational | Accepted limitation: browser-local storage is not a hosted trust boundary | Dashboard/application maintainers | `docs/security/THREAT-MODEL.md`, progress and personalization adapter tests |
-| OL-SEC-002 | Informational | Deferred: production issuer/audience validation and PostgreSQL transaction implementation | Service/persistence maintainers | `docs/ARCHITECTURE.md`, `apps/service/src/index.ts` |
-| OL-SEC-003 | Informational | Deferred: deployment ingress rate limits, TLS, and concrete security headers for the static host | Operations maintainers | `docs/phases/phase-10-beta-deployment-operations-and-community-release.md` |
+| OL-SEC-001 | Informational | Accepted limitation: browser-local storage remains a static-preview adapter, not a hosted trust boundary | Dashboard/application maintainers | `docs/security/THREAT-MODEL.md`, progress and personalization adapter tests |
+| OL-SEC-002 | Informational | Operator check: the selected issuer, database, and migration environment must be tested before learner traffic | Service/identity/data maintainers | `docs/quality/PHASE-10-RELEASE-GATE.md`, `docs/operations/DEPLOYMENT.md` |
+| OL-SEC-003 | Informational | Operator check: the selected ingress, TLS, backup, log-retention, and shared-rate-limit configuration is outside the portable image | Operations maintainers | `docs/operations/CONFIGURATION.md`, `docs/operations/RECOVERY.md` |
 
 No source-backed high or critical finding is accepted by this record.
 
@@ -44,4 +44,4 @@ pnpm run build
 git diff --check
 ```
 
-The current codebase has no production database, identity provider, live AI provider, or hosted ingress. Their security properties are therefore recorded as deferred contracts rather than inferred from local tests.
+The repository supplies a PostgreSQL adapter, provider-neutral identity verifier, connected dashboard API, CSRF/CORS/rate controls, and deployment security headers. The selected production database, identity provider, AI client, ingress, backup system, and legal controls are still external systems; their security properties must be verified during the operator release checklist rather than inferred from local tests.

@@ -167,3 +167,34 @@ test('applies a progress action with revision and progress compare-and-set input
   assert.equal(stale.outcome, 'conflict');
   assert.equal(stale.error?.code, 'stale_revision');
 });
+
+test('lists only owned active plans and deletes a plan through the fenced mutation path', async () => {
+  const state = createMemoryApplicationState();
+  const application = applicationFor(state);
+  const created = await application.createPlanView(actor, {
+    idempotencyKey: 'use-case-create-list-delete',
+    candidate,
+    acceptedAt: '2030-01-06T03:04:05Z',
+  });
+  if (created.value === undefined || application.listPlanViews === undefined || application.deletePlan === undefined) {
+    throw new Error('expected dashboard use cases');
+  }
+
+  const listed = await application.listPlanViews(actor);
+  assert.equal(listed.outcome, 'succeeded');
+  assert.equal(listed.value?.length, 1);
+  assert.equal(listed.value?.[0]?.planId, created.value.planId);
+
+  const deleted = await application.deletePlan(actor, {
+    planId: created.value.planId,
+    expectedRevisionId: created.value.revisionId,
+    idempotencyKey: 'use-case-delete-1',
+    deletedAt: '2030-01-06T03:04:06Z',
+  });
+  assert.equal(deleted.outcome, 'succeeded');
+  assert.equal((await application.listPlanViews(actor)).value?.length, 0);
+  assert.equal(
+    (await application.getPlanView(actor, { planId: created.value.planId })).error?.code,
+    'unavailable',
+  );
+});

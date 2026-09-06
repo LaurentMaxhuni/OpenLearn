@@ -1,11 +1,11 @@
 # OpenLearn project roadmap
 
-This roadmap describes the sequence from the repository foundation to a released AI-assisted learning dashboard. Local slices through Phase 9 are implemented and verified; hosted identity, persistence, provider, and deployment work remains in Phase 10.
+This roadmap describes the sequence from the repository foundation to a released AI-assisted learning dashboard. The local slices and Phase 10 portable beta baseline are implemented and verified; provider-specific deployment certification remains an operator release decision.
 
 ## Status legend
 
 - `Complete` means the phase exit criteria are satisfied.
-- `Local slice` means the local implementation and tests are present, while hosted adapters remain deferred.
+- `Local slice` means the phase was intentionally delivered with deterministic local adapters; hosted behavior is supplied only where the Phase 10 boundary documents it.
 - `Next` means the phase is the current focus.
 - `Planned` means the phase is later in the sequence and its prerequisites are not complete.
 
@@ -23,11 +23,11 @@ This roadmap describes the sequence from the repository foundation to a released
 | 7. Interactive learning experience and progress | Local slice | Learner actions and deterministic progress state | [Details](phases/phase-07-interactive-learning-and-progress.md) |
 | 8. Personalization and learner feedback | Local slice | Consent-aware feedback and suggestion review | [Details](phases/phase-08-personalization-and-learner-feedback.md) |
 | 9. Quality, security, accessibility, and performance | Complete | Verified local quality, safety, accessibility, resilience, and bundle gates | [Details](phases/phase-09-quality-security-accessibility-and-performance.md) |
-| 10. Beta, deployment, operations, and community release | Next | Operationally ready beta and first stable public release | [Details](phases/phase-10-beta-deployment-operations-and-community-release.md) |
+| 10. Beta, deployment, operations, and community release | Complete | Portable beta baseline, runbooks, release records, and operator-owned stable gate | [Details](phases/phase-10-beta-deployment-operations-and-community-release.md) |
 
 ## How to use this roadmap
 
-Start with the phase marked `Next`. Use its exit criteria to decide when the work is complete, then use its `Next phase` section to prepare the following handoff. The detailed phase documents contain the deliverables, workstreams, dependencies, risks, decisions, and reviewable completion checks for each stage.
+All roadmap phases have now reached their recorded implementation handoff. Use the Phase 10 release gate and stable checklist for a real deployment, then open a reviewed follow-up roadmap for the next product cycle. The detailed phase documents contain the deliverables, workstreams, dependencies, risks, decisions, and reviewable completion checks for each stage.
 
 The [documentation index](README.md) is the public entry point. The repository [README](../README.md) explains the current project direction and early-stage scope.
 
@@ -51,6 +51,6 @@ The sequence is intentionally ordered so that each later capability has a stable
 - Keep the phase order and statuses in this file synchronized with the detailed phase files.
 - Keep roadmap summaries concise; the phase files are the source of detail.
 - Change a phase status only after its exit criteria are reviewed and satisfied.
-- Keep future capabilities in future-oriented language until their relevant phase is complete.
+- Keep provider-specific or legally consequential deployment claims explicit until the selected operator has completed the stable checklist.
 - Record consequential architecture and product changes in the phase documentation that owns the decision.
 - Use dependencies and statuses instead of calendar promises.

@@ -2,6 +2,7 @@ import {
   applyProgressAction as applyDomainProgressAction,
   brandIdentifier,
   createPlan,
+  deletePlan as deleteDomainPlan,
   readOwnedAcceptedSnapshot,
   replacePlan,
   type DomainFailure,
@@ -30,8 +31,10 @@ import type {
   ApplyProgressActionInput,
   CapabilityScope,
   CreatePlanViewInput,
+  DeletePlanInput,
   GetPlanViewInput,
   PlanHandoff,
+  PlanSummary,
   PlanView,
   ProgressAction,
   SafeApplicationError,
@@ -56,6 +59,14 @@ export interface OpenLearnApplication {
     input: ApplyProgressActionInput,
     signal?: AbortSignal,
   ): Promise<ApplicationResult<PlanHandoff>>;
+  readonly listPlanViews?: (
+    actor: ActorContext,
+  ) => Promise<ApplicationResult<readonly PlanSummary[]>>;
+  readonly deletePlan?: (
+    actor: ActorContext,
+    input: DeletePlanInput,
+    signal?: AbortSignal,
+  ) => Promise<ApplicationResult<void>>;
 }
 
 const allowedProgressActions: readonly ProgressAction[] = [
@@ -214,24 +225,27 @@ const safeFingerprint = (
 
 const parsePlanId = (
   operationId: string,
-  value: string,
+  value: unknown,
 ): PlanId | ApplicationResult<never> => {
+  if (typeof value !== 'string') return invalidReference(operationId);
   const result = brandIdentifier('plan', value);
   return result.ok ? result.value : invalidReference(operationId);
 };
 
 const parseRevisionId = (
   operationId: string,
-  value: string,
+  value: unknown,
 ): RevisionId | ApplicationResult<never> => {
+  if (typeof value !== 'string') return invalidReference(operationId);
   const result = brandIdentifier('revision', value);
   return result.ok ? result.value : invalidReference(operationId);
 };
 
 const parsePlanItemId = (
   operationId: string,
-  value: string,
+  value: unknown,
 ): PlanItemId | ApplicationResult<never> => {
+  if (typeof value !== 'string') return invalidReference(operationId);
   const result = brandIdentifier('plan_item', value);
   return result.ok ? result.value : invalidReference(operationId);
 };
@@ -303,6 +317,140 @@ export const createApplication = (
           `/plans/${encodeURIComponent(snapshot.value.planId)}`,
           origin,
         ).toString(),
+      },
+    );
+  };
+
+  const listPlanViews = async (
+    actor: ActorContext,
+  ): Promise<ApplicationResult<readonly PlanSummary[]>> => {
+    const operationId = dependencies.operationIds.next();
+    if (!hasCapability(actor, 'plan:read')) {
+      return missingCapability(operationId, 'plan:read');
+    }
+    if (dependencies.state.listPlansByOwner === undefined) {
+      return applicationFailure(
+        { operationId, state: 'failed_retryable' },
+        {
+          code: 'internal_failure',
+          message: 'Plans could not be listed. Try again later.',
+          retryable: true,
+        },
+      );
+    }
+    let plans: readonly ActivePlanAggregate[];
+    try {
+      plans = (await dependencies.state.listPlansByOwner(actor.ownerId)).filter(
+        (plan): plan is ActivePlanAggregate => plan.lifecycle === 'active',
+      );
+    } catch {
+      return applicationFailure(
+        { operationId, state: 'failed_retryable' },
+        {
+          code: 'internal_failure',
+          message: 'Plans could not be listed. Try again later.',
+          retryable: true,
+        },
+      );
+    }
+    const summaries: PlanSummary[] = [];
+    for (const plan of plans) {
+      const snapshot = readOwnedAcceptedSnapshot(plan, actor.ownerId);
+      if (!snapshot.ok) {
+        return applicationFailure(
+          { operationId, state: 'failed_retryable' },
+          {
+            code: 'internal_failure',
+            message: 'A stored plan could not be read safely. Try again later.',
+            retryable: true,
+          },
+        );
+      }
+      summaries.push({
+        planId: snapshot.value.planId,
+        revisionId: snapshot.value.revisionId,
+        revisionNumber: snapshot.value.revisionNumber,
+        acceptedAt: snapshot.value.acceptedAt,
+        ...(snapshot.value.content.title === undefined
+          ? {}
+          : { title: snapshot.value.content.title }),
+        goalTitle: snapshot.value.content.goal.title,
+        progressSummary: snapshot.value.progressSummary,
+        ...(snapshot.value.nextItemId === undefined
+          ? {}
+          : { nextItemId: snapshot.value.nextItemId }),
+        dashboardUrl: new URL(
+          `/plans/${encodeURIComponent(snapshot.value.planId)}`,
+          origin,
+        ).toString(),
+      });
+    }
+    return applicationSuccess({ operationId, state: 'succeeded' }, summaries);
+  };
+
+  const deletePlan = async (
+    actor: ActorContext,
+    input: DeletePlanInput,
+    signal?: AbortSignal,
+  ): Promise<ApplicationResult<void>> => {
+    const operationId = dependencies.operationIds.next();
+    if (!hasCapability(actor, 'plan:write')) {
+      return missingCapability(operationId, 'plan:write');
+    }
+    const planId = parsePlanId(operationId, input.planId);
+    if (isFailureResult(planId)) return planId;
+    const expectedRevisionId = parseRevisionId(
+      operationId,
+      input.expectedRevisionId,
+    );
+    if (isFailureResult(expectedRevisionId)) return expectedRevisionId;
+    const fingerprint = safeFingerprint({
+      kind: 'delete_plan',
+      planId: input.planId,
+      expectedRevisionId: input.expectedRevisionId,
+      deletedAt: input.deletedAt,
+    });
+    if (fingerprint === undefined) {
+      return invalidInput(operationId, 'The deletion request could not be represented safely.');
+    }
+    return executeMutation(
+      mutationDependencies(dependencies),
+      {
+        actor,
+        kind: 'delete_plan',
+        capability: 'plan:write',
+        idempotencyKey: input.idempotencyKey,
+        requestFingerprint: fingerprint,
+        ...(signal === undefined ? {} : { signal }),
+        execute: async (transaction): Promise<MutationExecution<void>> => {
+          const current = await transaction.readPlan(planId);
+          if (current === undefined) {
+            return {
+              outcome: {
+                state: 'rejected',
+                error: {
+                  code: 'unavailable',
+                  message: 'The requested plan is not available.',
+                  retryable: false,
+                },
+              },
+            };
+          }
+          const deleted = deleteDomainPlan({
+            plan: current,
+            ownerId: actor.ownerId,
+            expectedRevisionId: expectedRevisionId as RevisionId,
+            deletedAt: input.deletedAt as Timestamp,
+            deletionOperationId: operationId,
+          });
+          if (!deleted.ok) {
+            return domainExecution(deleted);
+          }
+          await transaction.writePlan(deleted.value);
+          return {
+            outcome: { state: 'succeeded', planId: deleted.value.planId },
+          };
+        },
       },
     );
   };
@@ -507,5 +655,7 @@ export const createApplication = (
     createPlanView: createOrReplacePlan,
     getPlanView: readPlan,
     applyProgressAction: applyProgress,
+    listPlanViews,
+    deletePlan,
   };
 };

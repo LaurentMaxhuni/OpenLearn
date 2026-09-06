@@ -37,6 +37,7 @@ node_modules/
 .cache/
 .vercel/
 dist/
+**/dist-test/
 build/
 out/
 coverage/

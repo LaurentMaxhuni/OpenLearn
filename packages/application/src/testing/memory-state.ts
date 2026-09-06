@@ -44,6 +44,12 @@ export const createMemoryApplicationState = (
       return plans.get(planId);
     },
 
+    async listPlansByOwner(ownerId) {
+      return [...plans.values()].filter(
+        (plan) => plan.ownerId === ownerId && plan.lifecycle === 'active',
+      );
+    },
+
     async reserveOperation(input: OperationReservationInput): Promise<OperationReservation> {
       const key = operationKey(input.ownerId, input.capability, input.idempotencyKey);
       const existing = operations.get(key);

@@ -47,6 +47,7 @@ export interface PersonalizationStatePort {
 
 export interface ApplicationStatePort {
   readPlan(planId: PlanId): Promise<PlanAggregate | undefined>;
+  listPlansByOwner?(ownerId: InternalOwnerId): Promise<readonly PlanAggregate[]>;
   reserveOperation(
     input: OperationReservationInput,
   ): Promise<OperationReservation>;

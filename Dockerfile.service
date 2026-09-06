@@ -1,0 +1,40 @@
+FROM node:24-alpine AS build
+
+WORKDIR /app
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+COPY apps/service/package.json apps/service/package.json
+COPY packages/application/package.json packages/application/package.json
+COPY packages/domain/package.json packages/domain/package.json
+COPY packages/identity/package.json packages/identity/package.json
+COPY packages/mcp/package.json packages/mcp/package.json
+COPY packages/persistence/package.json packages/persistence/package.json
+COPY packages/ui/package.json packages/ui/package.json
+RUN pnpm install --frozen-lockfile
+
+COPY apps apps
+COPY packages packages
+COPY scripts scripts
+RUN pnpm run build:packages && pnpm --filter @openlearn/service run build
+
+FROM node:24-alpine AS runtime
+
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/service/package.json ./apps/service/package.json
+COPY --from=build /app/apps/service/dist ./apps/service/dist
+COPY --from=build /app/packages/application/package.json ./packages/application/package.json
+COPY --from=build /app/packages/application/dist ./packages/application/dist
+COPY --from=build /app/packages/domain/package.json ./packages/domain/package.json
+COPY --from=build /app/packages/domain/dist ./packages/domain/dist
+COPY --from=build /app/packages/identity/package.json ./packages/identity/package.json
+COPY --from=build /app/packages/identity/dist ./packages/identity/dist
+COPY --from=build /app/packages/mcp/package.json ./packages/mcp/package.json
+COPY --from=build /app/packages/mcp/dist ./packages/mcp/dist
+COPY --from=build /app/packages/persistence/package.json ./packages/persistence/package.json
+COPY --from=build /app/packages/persistence/dist ./packages/persistence/dist
+USER node
+EXPOSE 3000
+CMD ["node", "apps/service/dist/entrypoint.js"]

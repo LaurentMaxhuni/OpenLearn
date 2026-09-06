@@ -6,7 +6,7 @@ It provides:
 
 - capability-scoped actor contexts for plan reads, plan writes, and progress writes;
 - idempotent operation reservation, request fingerprints, cancellation, deadlines, recovery leases, and fencing metadata;
-- accepted-plan create, replacement, owner-scoped read, and progress-action use cases;
+- accepted-plan create, replacement, owner-scoped read/list, progress-action, and deletion use cases;
 - capability-scoped personalization consent, bounded feedback, deterministic proposal review, opaque revision handoffs, and purge use cases; and
 - ports for durable state, transactions, identity allocation, clocks, operation IDs, and redacted telemetry.
 

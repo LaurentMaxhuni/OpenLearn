@@ -2,11 +2,11 @@
 
 **Status:** Accepted for implementation
 
-**Availability:** Local implementation available. This document records the technical baseline; production persistence, identity, provider, telemetry, and deployment adapters remain deferred.
+**Availability:** Local and portable hosted adapters are implemented. This document records the technical baseline; the identity provider, hosting vendor, backup system, and login/callback integration remain deployment choices.
 
 ## Purpose
 
-OpenLearn is a standalone dashboard and reusable component surface that an external AI client can use through MCP. The external AI client interprets the learner's request and supplies or revises plan-shaped content. OpenLearn validates that input, coordinates accepted plan and progress state, and maps it onto OpenLearn-owned components. The repository currently provides deterministic local adapters and tests; hosted state and identity adapters remain separate work.
+OpenLearn is a standalone dashboard and reusable component surface that an external AI client can use through MCP. The external AI client interprets the learner's request and supplies or revises plan-shaped content. OpenLearn validates that input, coordinates accepted plan and progress state, and maps it onto OpenLearn-owned components. The repository provides deterministic local adapters plus provider-neutral PostgreSQL, identity, service, and connected-dashboard adapters.
 
 The architecture keeps four concerns separate:
 
@@ -90,6 +90,7 @@ packages/
   domain/          Plan state, identifiers, lifecycle, and validation contracts
   application/     Use cases, actor context, ports, and structured results
   persistence/     PostgreSQL adapters and migrations
+  identity/        OIDC/OAuth verification and session helpers
   mcp/             MCP transport, capability registration, and request mapping
   config/           Shared compiler, lint, and test configuration where useful
 ```
@@ -109,7 +110,7 @@ External content is data, not executable instructions. MCP calls cannot cause ar
 
 ## Persistence boundary
 
-PostgreSQL is the durable source of truth for accepted domain state. The eventual schema will cover the concepts required by the Phase 1 journeys:
+PostgreSQL is the durable source of truth for accepted domain state. Migration 001 covers the concepts required by the Phase 1 journeys:
 
 | Durable category | Purpose |
 | --- | --- |
@@ -125,7 +126,7 @@ Raw AI conversations, access tokens, authorization codes, and complete tool payl
 
 ### Initial retention and deletion assumptions
 
-These are the minimum product assumptions for the first implementation. Phase 9 must verify them against the final deployment, privacy review, and applicable obligations; it must not replace them with an undefined policy after schema work begins.
+These are the minimum product assumptions for the first implementation. The Phase 10 release gate verifies the repository adapter and requires the selected deployment to review them against applicable obligations; it must not replace them with an undefined policy after schema work begins.
 
 - Accepted plan revisions and learner progress remain available while the learner's account and plan exist. The minimum product has no inactivity expiry because returning-user access is a core journey.
 - A learner-initiated plan deletion immediately removes the plan from dashboard reads and rejects further reads or mutations for that plan. The primary durable content, revisions, and progress are purged within 24 hours of the deletion request. A minimal deletion tombstone may remain only to prevent stale retries or backup restores from resurrecting the plan.
@@ -211,14 +212,13 @@ pnpm build
 pnpm verify
 ```
 
-The repository also documents the future PostgreSQL dependency, migration/reset command, fixture loading, test identity setup, and stdio MCP smoke-test boundary as production-adapter work. Verification runs without a live AI provider and covers contract-shaped fixtures, application state transitions, UI states, and MCP adapter behavior.
+The repository provides the PostgreSQL dependency, migration command, maintenance sweep, connected dashboard API/client, test identity helpers, and stdio MCP smoke-test boundary. Verification runs without a live AI provider and covers contract-shaped fixtures, application state transitions, UI states, identity verification, API trust controls, and adapter behavior.
 
-## Deliberately deferred
+## Deliberately outside the repository baseline
 
-- Phase 3 defines design tokens, responsive layout, accessibility acceptance criteria, and the complete component-state matrix.
-- Phase 4 defines the canonical plan schema, exact identifiers, lifecycle fields, progress, ordering, and revision semantics within the ownership, retention, handoff, and mutation rules above.
-- Phase 6 defines exact MCP tool names, payloads, result envelopes, protocol cancellation wiring, compatibility behavior, and provider-facing discovery within the lifecycle rules above. It may tune bounded values such as the request deadline only with a documented contract change.
-- The identity provider, deployment vendor, database host, and package registry are not selected by this baseline.
+- The identity provider, deployment vendor, database host, backup system, and package registry are not selected by this baseline.
+- Provider-specific login/callback exchange and external AI chat/model execution remain outside OpenLearn; connected clients re-enter through the validated MCP boundary.
+- A real deployment must supply TLS/ingress policy, shared rate limits, backup deletion replay, log retention, legal review, and browser performance evidence.
 - Public UI package distribution and semantic-versioning policy wait until an external consumer exists.
 
 ## Phase 3 handoff

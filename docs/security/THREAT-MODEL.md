@@ -1,10 +1,10 @@
 # OpenLearn Phase 9 threat model
 
 **Review date:** 2026-09-05
-**Scope:** Current repository implementation, including the domain, application, MCP, Fastify composition, static dashboard, browser-local progress store, and browser-local personalization store.
+**Scope:** Current repository implementation, including the domain, application, MCP, Fastify composition, connected/static dashboard paths, PostgreSQL adapter, identity verifier, maintenance job, and browser-local preview stores.
 **Owner:** OpenLearn maintainers
 
-This is a source-backed threat model for the current implementation. It is not a production penetration test, a deployment certification, or a substitute for the configured authentication, persistence, and ingress review required before hosting learner data.
+This is a source-backed threat model for the repository baseline. It is not a production penetration test, a deployment certification, or a substitute for the configured provider, persistence, backup, and ingress review required before hosting learner data.
 
 ## Assets and trust boundaries
 
@@ -23,7 +23,7 @@ The active boundaries are:
 2. Remote HTTP requests enter Fastify through Origin validation and an explicit HTTP authenticator before an actor-bound MCP server is created.
 3. Application use cases receive an internal actor and call domain transitions or explicit ports; they do not accept caller-selected owners or raw credentials.
 4. The browser renders only view models and stores minimal owner/plan-scoped progress or personalization records through validating adapters.
-5. The future identity, PostgreSQL, telemetry, and connected AI adapters remain outside this repository's current runtime implementation.
+5. The selected identity provider, database host, telemetry retention system, ingress, and connected AI client remain external deployment systems even though provider-neutral repository adapters exist.
 
 ## Attacker capabilities
 
@@ -34,11 +34,11 @@ The model considers a caller who can submit arbitrary MCP JSON, a caller with an
 | Threat | Relevant control | Evidence | Residual risk |
 | --- | --- | --- | --- |
 | Prompt injection or unsafe generated output changes application behavior | Generated content is data; strict MCP schemas and Phase 4 normalization run before accepted state; no code-generation or HTML sink exists in product source | `packages/mcp/src/contracts.ts`, `packages/application/src/use-cases.ts`, `packages/domain/src/normalize.ts`, `scripts/quality-gates.mjs` | Future AI adapters must preserve this path and must never execute model output |
-| IDOR or cross-owner access | Actor owner is resolved outside caller input; application checks capabilities and domain owner/plan scope; missing resources are non-disclosing | `packages/application/src/authorize.ts`, `packages/application/src/use-cases.ts`, domain authorization tests | Production authentication and persistence adapters are not implemented |
+| IDOR or cross-owner access | Actor owner is resolved from verified issuer/subject mapping; application checks capabilities and domain owner/plan scope; missing resources are non-disclosing | `packages/identity/src/authenticator.ts`, `packages/persistence/src/owner-resolver.ts`, `packages/application/src/use-cases.ts` | The selected provider, provisioning workflow, and database deployment still require operator testing |
 | Replay, duplicate mutation, or stale worker overwrites state | Required idempotency keys, request fingerprints, leases, fencing, revision/progress versions, and CAS ports | `packages/application/src/lifecycle.ts`, `packages/application/test/lifecycle.test.ts`, domain revision/progress tests | Cross-instance guarantees depend on a real durable adapter |
 | Browser XSS or unsafe resource navigation | React escaping, no executable HTML sinks, HTTPS-only canonical resources, CSP deployment contract, and source gate | `packages/domain/src/validation.ts`, `packages/domain/src/normalize.ts`, `packages/ui/src/components.tsx`, `apps/dashboard/index.html` | Same-origin script compromise would expose browser-local records; deploy CSP and dependency controls remain required |
-| CSRF or cross-origin MCP use | Controlled Origin allowlist, authentication before MCP construction, no anonymous production path, and no caller redirect | `apps/service/src/index.ts`, `apps/service/test/service.test.ts` | Exact OAuth audience/issuer validation belongs to the future authenticator |
-| Request/resource exhaustion | 512 KiB Fastify body limit, bounded protocol strings/collections, domain collection/text limits, and dashboard bundle budget | `packages/mcp/src/contracts.ts`, `apps/service/src/security.ts`, `packages/domain/src/limits.ts`, `apps/dashboard/performance-budget.json` | Provider/network timeouts and production rate limits still need deployment adapters |
+| CSRF or cross-origin MCP use | Controlled Origin allowlist, authenticated dashboard CSRF double-submit, authentication before MCP construction, no anonymous production path, and no caller redirect | `apps/service/src/index.ts`, `apps/service/src/csrf.ts`, `apps/service/test/dashboard-api.test.ts` | The real edge must preserve origin, cookie, and header behavior |
+| Request/resource exhaustion | 512 KiB Fastify body limit, bounded protocol strings/collections, domain collection/text limits, dashboard bundle budget, and per-instance rate guard | `packages/mcp/src/contracts.ts`, `apps/service/src/rate-limit.ts`, `packages/domain/src/limits.ts`, `apps/dashboard/performance-budget.json` | Shared ingress rate policy and provider/network timeouts are deployment-specific |
 | Sensitive data leakage through errors or telemetry | Generic service/MCP failures, safe application errors, no raw request fields in telemetry, and retention windows | `packages/application/src/contracts.ts`, `packages/application/src/lifecycle.ts`, `docs/privacy/PRIVACY-REVIEW.md` | A production telemetry sink still needs a redaction test against its concrete implementation |
 | Tampered browser storage resurrects revoked feedback or progress | Hydration validates owner/plan scope and record shape; stores use versioned keys and compare-and-set; domain revoke/delete transitions remove eligibility | `apps/dashboard/src/progress-store.ts`, `apps/dashboard/src/personalization-store.ts`, corresponding tests | Browser storage is not a durable trust boundary; server-backed adapters are required for hosted use |
 
@@ -53,7 +53,7 @@ The model considers a caller who can submit arbitrary MCP JSON, a caller with an
 
 ## Required follow-up before production
 
-Configure and test one canonical OIDC/OAuth issuer, audience-bound remote MCP tokens, PostgreSQL transactions and migrations, server-side rate limits, deployment headers/TLS, backup deletion replay, telemetry redaction, and an external AI adapter that re-enters the existing domain validation path. Phase 10 owns deployment/operations; these are not silently treated as complete by this repository review.
+Before production, configure and test one canonical OIDC/OAuth issuer, audience-bound remote MCP tokens, PostgreSQL transactions and migrations, server-side shared rate limits, deployment headers/TLS, backup deletion replay, telemetry retention, and an external AI adapter that re-enters the existing domain validation path. The repository baseline supplies the portable controls; the operator must verify the selected external systems.
 
 ## Phase 9 scan note
 

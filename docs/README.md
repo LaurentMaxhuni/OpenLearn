@@ -1,6 +1,6 @@
 # OpenLearn documentation
 
-This directory explains the product direction and contributor-facing delivery sequence for OpenLearn. The local domain, application, MCP, service, dashboard, progress, personalization, and Phase 9 quality slices are implemented and documented; hosted identity, persistence, provider, and deployment integration remain future work.
+This directory explains the product direction and contributor-facing delivery sequence for OpenLearn. The local domain, application, MCP, service, dashboard, progress, personalization, and Phase 10 portable beta slices are implemented and documented. Provider-specific deployment certification remains an explicit operator responsibility.
 
 ## Public documentation
 
@@ -26,6 +26,8 @@ The detailed phase documents are listed below:
 
 Phase 9 evidence is recorded in the [quality-gate record](quality/PHASE-9-QUALITY-GATE.md), [threat model](security/THREAT-MODEL.md), [security review](security/SECURITY-REVIEW.md), and [privacy review](privacy/PRIVACY-REVIEW.md).
 
+Phase 10 evidence is recorded in the [release gate](quality/PHASE-10-RELEASE-GATE.md), [operations runbooks](operations/README.md), and [release records](release/README.md).
+
 ## For contributors
 
 Read the [repository README](../README.md) for the project overview and current scope. Read the [contribution guide](../CONTRIBUTING.md) before opening an issue or pull request. The [GitHub repository](https://github.com/LaurentMaxhuni/OpenLearn) is the place to discuss product direction and implementation work.
@@ -33,8 +35,8 @@ Read the [repository README](../README.md) for the project overview and current 
 ## Keeping this documentation truthful
 
 - `Complete` means the phase exit criteria have been satisfied.
-- `Local slice` means the local implementation and tests are present, while hosted adapters remain deferred.
-- `Next` identifies the current phase that should receive focused work.
+- `Local slice` means the phase was intentionally delivered with deterministic local adapters; later hosted adapters must still preserve its contracts.
+- `Next` identifies the current phase that should receive focused work; the current roadmap has no remaining phase marked `Next`.
 - `Planned` identifies work whose prerequisites are not complete.
 - Planned capabilities must not be described as available features.
 - Phase statuses change only when the phase exit criteria are reviewed and satisfied.

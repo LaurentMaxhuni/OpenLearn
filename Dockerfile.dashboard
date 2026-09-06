@@ -1,0 +1,33 @@
+FROM node:24-alpine AS build
+
+WORKDIR /app
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+COPY apps/dashboard/package.json apps/dashboard/package.json
+COPY packages/domain/package.json packages/domain/package.json
+COPY packages/ui/package.json packages/ui/package.json
+COPY packages/application/package.json packages/application/package.json
+COPY packages/identity/package.json packages/identity/package.json
+COPY packages/mcp/package.json packages/mcp/package.json
+COPY packages/persistence/package.json packages/persistence/package.json
+RUN pnpm install --frozen-lockfile
+
+ARG VITE_OPENLEARN_MODE=static
+ARG VITE_OPENLEARN_SERVICE_ORIGIN=
+ENV VITE_OPENLEARN_MODE=${VITE_OPENLEARN_MODE}
+ENV VITE_OPENLEARN_SERVICE_ORIGIN=${VITE_OPENLEARN_SERVICE_ORIGIN}
+
+COPY apps/dashboard apps/dashboard
+COPY packages/domain packages/domain
+COPY packages/ui packages/ui
+COPY packages/application packages/application
+COPY scripts scripts
+RUN pnpm --filter @openlearn/domain run build
+RUN pnpm --filter @openlearn/application run build
+RUN pnpm --filter @openlearn/dashboard run build
+
+FROM nginx:1.29-alpine AS runtime
+COPY deploy/dashboard/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/dashboard/dist /usr/share/nginx/html
+EXPOSE 80

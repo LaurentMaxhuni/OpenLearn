@@ -5,6 +5,7 @@ import type {
   PlanId,
   PlanItemId,
   RevisionId,
+  ProgressSummary,
 } from '@openlearn/domain';
 
 export const CAPABILITY_SCOPES = [
@@ -45,7 +46,8 @@ export interface ActorContext {
 export type OperationKind =
   | 'create_plan_view'
   | 'replace_plan_view'
-  | 'apply_progress_action';
+  | 'apply_progress_action'
+  | 'delete_plan';
 
 export interface OperationView {
   readonly operationId: string;
@@ -76,6 +78,18 @@ export interface PlanView extends AcceptedPlanSnapshot {
   readonly dashboardUrl: string;
 }
 
+export interface PlanSummary {
+  readonly planId: PlanId;
+  readonly revisionId: RevisionId;
+  readonly revisionNumber: number;
+  readonly acceptedAt: string;
+  readonly title?: string;
+  readonly goalTitle: string;
+  readonly progressSummary: ProgressSummary;
+  readonly nextItemId?: PlanItemId;
+  readonly dashboardUrl: string;
+}
+
 export interface CreatePlanViewInput {
   readonly idempotencyKey: string;
   readonly candidate: unknown;
@@ -86,6 +100,13 @@ export interface CreatePlanViewInput {
 
 export interface GetPlanViewInput {
   readonly planId: string;
+}
+
+export interface DeletePlanInput {
+  readonly planId: string;
+  readonly expectedRevisionId: string;
+  readonly idempotencyKey: string;
+  readonly deletedAt: string;
 }
 
 export type ProgressAction =

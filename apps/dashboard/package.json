@@ -10,6 +10,7 @@
     "test": "tsc -p tsconfig.test.json && node --test dist-test/apps/dashboard/test/*.test.js"
   },
   "dependencies": {
+    "@openlearn/application": "workspace:*",
     "@openlearn/domain": "workspace:*",
     "@openlearn/ui": "workspace:*",
     "react": "^19.1.1",

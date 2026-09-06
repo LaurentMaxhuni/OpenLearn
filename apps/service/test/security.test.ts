@@ -109,3 +109,82 @@ test('adds security headers to hijacked MCP responses', async () => {
     await service.app.close();
   }
 });
+
+test('enforces the bounded per-instance rate limit before authentication', async () => {
+  let authenticationCalls = 0;
+  const service = createService({
+    config: {
+      dashboardOrigin: 'https://dashboard.example.test',
+      allowedOrigins: ['https://allowed.example.test'],
+      host: '127.0.0.1',
+      port: 3000,
+      mcpPath: '/mcp',
+      buildVersion: 'security-rate-limit',
+      rateLimit: { maxRequests: 1, windowMs: 60_000 },
+    },
+    dependencies: {
+      application,
+      authenticateHttp: async () => {
+        authenticationCalls += 1;
+        return actor;
+      },
+      authenticateStdio: async () => actor,
+      operationIds: { next: () => 'security-rate-operation' },
+    },
+  });
+  try {
+    const request = {
+      method: 'POST' as const,
+      url: '/mcp',
+      headers: {
+        origin: 'https://allowed.example.test',
+        accept: 'application/json, text/event-stream',
+      },
+      payload: { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} },
+    };
+    const first = await service.app.inject(request);
+    const second = await service.app.inject(request);
+    assert.notEqual(first.statusCode, 429);
+    assert.equal(second.statusCode, 429);
+    assert.equal(authenticationCalls, 1);
+    assert.equal(second.headers['retry-after'] !== undefined, true);
+  } finally {
+    await service.app.close();
+  }
+});
+
+test('exposes aggregate metrics and production transport security', async () => {
+  const service = createService({
+    config: {
+      dashboardOrigin: 'https://dashboard.example.test',
+      allowedOrigins: ['https://dashboard.example.test'],
+      host: '127.0.0.1',
+      port: 3000,
+      mcpPath: '/mcp',
+      buildVersion: 'metrics-test',
+      environment: 'production',
+      metricsToken: 'm'.repeat(32),
+    },
+    dependencies: {
+      application,
+      authenticateHttp: async () => actor,
+      authenticateStdio: async () => actor,
+      operationIds: { next: () => 'metrics-operation' },
+    },
+  });
+  try {
+    const health = await service.app.inject({ method: 'GET', url: '/health/live' });
+    assert.equal(health.headers['strict-transport-security'], 'max-age=31536000; includeSubDomains');
+    const unauthorized = await service.app.inject({ method: 'GET', url: '/metrics' });
+    assert.equal(unauthorized.statusCode, 401);
+    const metrics = await service.app.inject({
+      method: 'GET',
+      url: '/metrics',
+      headers: { authorization: `Bearer ${'m'.repeat(32)}` },
+    });
+    assert.equal(metrics.statusCode, 200);
+    assert.match(metrics.body, /openlearn_http_requests_total/u);
+  } finally {
+    await service.app.close();
+  }
+});

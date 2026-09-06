@@ -1,0 +1,54 @@
+services:
+  database:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: openlearn
+      POSTGRES_USER: openlearn
+      POSTGRES_PASSWORD: openlearn
+    ports:
+      - "5432:5432"
+    volumes:
+      - openlearn-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openlearn -d openlearn"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+    environment:
+      OPENLEARN_ENVIRONMENT: local
+      OPENLEARN_BUILD_VERSION: compose
+      OPENLEARN_DASHBOARD_ORIGIN: http://localhost:4173
+      OPENLEARN_ALLOWED_ORIGINS: http://localhost:4173
+      OPENLEARN_SERVICE_HOST: 0.0.0.0
+      OPENLEARN_SERVICE_PORT: 3000
+      OPENLEARN_DATABASE_URL: postgres://openlearn:openlearn@database:5432/openlearn
+      OPENLEARN_OIDC_ISSUER: https://identity.example.test
+      OPENLEARN_OIDC_JWKS_URL: https://identity.example.test/.well-known/jwks.json
+      OPENLEARN_OIDC_AUDIENCE: https://service.example.test/mcp
+      OPENLEARN_DASHBOARD_AUDIENCE: https://dashboard.example.test
+      OPENLEARN_SESSION_SECRET: local-compose-secret-change-me-32-bytes
+      OPENLEARN_METRICS_TOKEN: local-compose-metrics-token-change-me-32
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+      args:
+        VITE_OPENLEARN_MODE: connected
+    depends_on:
+      - service
+    ports:
+      - "4173:80"
+
+volumes:
+  openlearn-postgres:

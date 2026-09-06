@@ -16,7 +16,7 @@ The approved first implementation slice is present in the repository and covered
 - `@openlearn/mcp` uses the official MCP TypeScript SDK. It registers the exact three Phase 6 tools, filters discovery by the supplied actor scopes, validates strict protocol inputs, and maps safe application results into the `openlearn.phase6.v1` structured envelope and concise text content. Stdio and Streamable HTTP transport factories are available; legacy HTTP+SSE is not introduced.
 - `apps/service` composes Fastify health endpoints and stateless Streamable HTTP handling. It validates controlled origins and authenticates HTTP requests before constructing an actor-bound MCP server. Local stdio startup requires an explicit authenticator and keeps diagnostics on `stderr`.
 
-The full workspace verification passes on the available runtime. Phase 6 is a `Local slice`: this increment does not claim a production persistence adapter, configured identity provider, durable MCP session store, deployment configuration, provider/model SDK, prompt interpretation, or a complete protocol-client compatibility matrix. Those hosted concerns remain in Phase 10.
+The full workspace verification passes on the available runtime. Phase 6 is recorded as a `Local slice` because its first increment intentionally used deterministic adapters. The Phase 10 baseline now supplies the provider-neutral identity, PostgreSQL persistence, deployment, telemetry, rate, and connected dashboard boundaries; the external AI client remains responsible for prompt interpretation and model execution, and protocol compatibility remains deployment/client-specific.
 
 ## Why this phase matters
 

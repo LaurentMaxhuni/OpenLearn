@@ -15,7 +15,7 @@ Define how learner progress and explicit feedback may inform plan adjustments, r
 - The dashboard provides learner-readable controls, feedback correction/deletion, suggestion review, and a validating browser-local adapter that starts disabled.
 - Personalization journey, CAS-conflict, deletion, retention, and no-raw-feedback telemetry tests pass in the Phase 9 verification record.
 
-The slice records learner intent only; it never mutates accepted plan content or confirmed progress. Live AI evaluation, server persistence, telemetry sinks, and hosted identity remain Phase 10 work.
+The slice records learner intent only; it never mutates accepted plan content or confirmed progress. Phase 10 supplies hosted identity, PostgreSQL state for the existing personalization port, and redacted telemetry composition; the hosted dashboard API does not yet expose personalization mutation endpoints, and live AI evaluation remains the connected client's responsibility.
 
 ## Why this phase matters
 

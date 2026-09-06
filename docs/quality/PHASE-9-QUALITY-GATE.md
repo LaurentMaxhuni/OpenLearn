@@ -1,7 +1,7 @@
 # OpenLearn Phase 9 quality-gate record
 
 **Review date:** 2026-09-05
-**Status:** Complete for the local implementation; hosted adapter gates remain deferred to Phase 10.
+**Status:** Complete for the Phase 9 local implementation; its hosted adapter follow-up is recorded in the Phase 10 release gate.
 **Scope:** Current `main` tree after the Phase 9 implementation work.
 
 ## Gate status
@@ -15,13 +15,13 @@
 | Phase 9 journey/resilience tests | Verified | Dashboard journey/state tests, application storage/telemetry tests, MCP safe-error tests, and service readiness/header tests passed in the full run |
 | MCP/service trust-boundary tests | Verified | `@openlearn/mcp` and `@openlearn/service` tests cover bounds, origin, auth order, and headers |
 | Threat model | Verified | `docs/security/THREAT-MODEL.md` |
-| Privacy and retention review | Verified for local slice | `docs/privacy/PRIVACY-REVIEW.md`; production purge sink remains deferred |
+| Privacy and retention review | Verified for local slice and carried into Phase 10 | `docs/privacy/PRIVACY-REVIEW.md`; selected deployment retention remains operator-owned |
 | Accessibility source contract | Verified | Focus-visible, reduced-motion, document language, native controls, and live-region markers are checked |
 | Keyboard/narrow reflow inspection | Verified (manual) | At 507px viewport / 492px document width: skip link, route and item focus, action/status announcements, disclosure controls, resource links, visible focus ring, no duplicate IDs, and no horizontal overflow |
 | Dashboard bundle budget | Verified | JavaScript 288,680 bytes; CSS 18,051 bytes; total 306,731 bytes against 358,400 / 102,400 / 460,800-byte limits |
 | Core Web Vitals | Deferred | Chrome DevTools MCP is not available in this host; no LCP/INP/CLS values are claimed |
 | Standard repository security scan | Verified with limitation | Scan `344794a1-8901-4e64-84c8-28664b9058e4` sealed with 0 reportable findings across 6 reviewed surfaces; coverage is partial because delegated reviewers were unavailable and the scan snapshot predates the final working-tree edits |
-| Production identity, PostgreSQL, live AI, and ingress | Deferred | Not implemented in this repository; Phase 10 owns deployment readiness |
+| Production identity, PostgreSQL, connected dashboard, and ingress controls | Covered by Phase 10 baseline | `docs/quality/PHASE-10-RELEASE-GATE.md`; selected external systems still require deployment checks |
 
 ## Repeatable commands
 
@@ -54,7 +54,7 @@ The scan found no reportable findings in the six recorded surfaces. TAC advisory
 
 ## Release decision rule
 
-Phase 9 is `Complete` for the local implementation because every runnable gate has current evidence and unavailable coverage is explicitly documented. A deferred Core Web Vitals measurement is not a clean performance result; the local bundle budget is the measurable fallback until browser tooling is available. Phase 10 must close the production identity, persistence, provider, telemetry, ingress, rate-limit, and hosted deletion gates before beta use.
+Phase 9 is `Complete` for the local implementation because every runnable gate has current evidence and unavailable coverage is explicitly documented. A deferred Core Web Vitals measurement is not a clean performance result; the local bundle budget is the measurable fallback until browser tooling is available. Phase 10 closes the repository-side identity, persistence, telemetry, ingress-control, rate-limit, and hosted deletion gates. The selected deployment must still complete the external checks listed in the Phase 10 stable checklist before beta use.
 
 ## Final handoff
 

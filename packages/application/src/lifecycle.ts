@@ -218,7 +218,11 @@ export const executeMutation = async <T>(
   request: MutationRequest<T>,
 ): Promise<ApplicationResult<T>> => {
   const operationId = dependencies.operationIds.next();
-  if (request.idempotencyKey.trim().length === 0) {
+  if (
+    typeof request.idempotencyKey !== 'string' ||
+    request.idempotencyKey.trim().length === 0 ||
+    request.idempotencyKey.length > 128
+  ) {
     return applicationFailure(
       { operationId, state: 'rejected' },
       {

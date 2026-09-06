@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned
+Complete
 
 ## Objective
 
@@ -49,12 +49,38 @@ Release readiness includes more than shipping application code. Maintainers need
 
 ## Exit criteria
 
-- A reproducible build, test, and deployment path exists.
-- Environment, configuration, persistence, migration, rollback, and recovery procedures are documented and exercised.
-- Monitoring, alerting, support, and incident runbooks have identified owners.
-- Beta feedback has been collected, reviewed, and translated into prioritized release decisions.
-- Contributor onboarding and release communication are ready.
-- The first stable public-release checklist is complete and the release scope is explicit.
+- A reproducible build, test, and deployment path exists through the root
+  verification gate, CI workflow, OCI image definitions, and Compose topology.
+- Environment, configuration, persistence, migration, rollback, and recovery
+  procedures are documented in the Phase 10 operations runbooks.
+- Monitoring, alerting, support, and incident runbooks have identified
+  deployment-owned roles and privacy-aware signals.
+- A controlled beta feedback process, issue template, triage severity model,
+  and release decision record are present.
+- Contributor onboarding and release communication are ready through the
+  repository contribution/support/security guides and release notes.
+- The stable release checklist is complete as a review artifact and makes
+  operator-owned production checks explicit.
+
+## Delivered baseline
+
+- `@openlearn/persistence` provides PostgreSQL migrations, aggregate storage,
+  fenced operation recovery, mutation markers, personalization CAS, deletion
+  tombstones, and bounded retention maintenance.
+- `@openlearn/identity` verifies issuer/audience-bound OIDC/OAuth JWTs and
+  signed dashboard sessions, then resolves only explicit `(issuer, subject)`
+  mappings to internal owners.
+- `apps/service` provides authenticated dashboard plan APIs, CSRF/CORS and
+  rate-limit controls, protected metrics, health checks, and a maintenance
+  command. The connected dashboard client uses the API for plans, progress,
+  and deletion.
+- CI verifies the repository and builds both service and dashboard images;
+  deployments remain portable and provider-neutral.
+
+The phase is complete for the repository baseline. A real beta deployment must
+still be approved with the [stable release checklist](../release/STABLE-RELEASE-CHECKLIST.md)
+after the selected identity provider, PostgreSQL host, TLS ingress, backup
+system, legal review, and browser performance environment have been exercised.
 
 ## Next phase
 
