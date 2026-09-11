@@ -22,6 +22,20 @@ export const MCP_TOOL_NAMES = [
   'openlearn.apply_progress_action',
 ] as const;
 
+export interface McpOAuthSecurityScheme {
+  readonly type: 'oauth2';
+  readonly scopes: readonly string[];
+}
+
+export const oauth2SecuritySchemes = (
+  scopes: readonly string[],
+): readonly McpOAuthSecurityScheme[] => [
+  {
+    type: 'oauth2',
+    scopes: [...scopes],
+  },
+];
+
 const identifierSchema = z
   .string()
   .regex(/^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}$/u);

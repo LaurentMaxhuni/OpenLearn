@@ -1,5 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ListToolsRequestSchema,
+  type CallToolResult,
+} from '@modelcontextprotocol/sdk/types.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
   ActorContext,
@@ -17,6 +20,7 @@ import {
   applyProgressActionInputSchema,
   createPlanViewInputSchema,
   getPlanViewInputSchema,
+  oauth2SecuritySchemes,
   resultOutputSchema,
   type McpResultEnvelope,
   type McpServerDependencies,
@@ -62,6 +66,53 @@ const resultFieldsForView = (value: PlanView): ResultFields => ({
   },
   snapshot: (({ dashboardUrl: _dashboardUrl, ...snapshot }) => snapshot)(value),
 });
+
+type SerializedTool = Record<string, unknown> & {
+  readonly _meta?: Record<string, unknown>;
+};
+
+type ToolListResult = {
+  readonly tools: readonly SerializedTool[];
+};
+
+type RequestHandler = (
+  request: unknown,
+  extra: unknown,
+) => Promise<ToolListResult>;
+
+type ServerInternals = {
+  readonly _requestHandlers?: Map<string, RequestHandler>;
+};
+
+/**
+ * The MCP SDK currently serializes custom tool metadata under `_meta`, while
+ * ChatGPT's connector auth contract reads `securitySchemes` at the tool root.
+ * Keep the metadata mirrored and promote it at the SDK boundary. This is
+ * isolated here so the rest of the application remains SDK-agnostic.
+ */
+const exposeRootSecuritySchemes = (server: McpServer): void => {
+  const internals = server.server as unknown as ServerInternals;
+  const originalHandler = internals._requestHandlers?.get('tools/list');
+  if (originalHandler === undefined) {
+    throw new Error('MCP SDK did not install the tools/list handler.');
+  }
+
+  server.server.setRequestHandler(
+    ListToolsRequestSchema,
+    async (request, extra) => {
+      const result = await originalHandler(request, extra);
+      return {
+        ...result,
+        tools: result.tools.map((tool) => {
+          const securitySchemes = tool._meta?.securitySchemes;
+          return securitySchemes === undefined
+            ? tool
+            : { ...tool, securitySchemes };
+        }),
+      };
+    },
+  );
+};
 
 const toEnvelope = <T>(
   result: ApplicationResult<T>,
@@ -137,6 +188,9 @@ export const createMcpServer = (
           destructiveHint: false,
           idempotentHint: true,
         },
+        _meta: {
+          securitySchemes: oauth2SecuritySchemes(['plan:write']),
+        },
       },
       (input, extra) =>
         run(
@@ -165,6 +219,9 @@ export const createMcpServer = (
           destructiveHint: false,
           idempotentHint: true,
         },
+        _meta: {
+          securitySchemes: oauth2SecuritySchemes(['plan:read']),
+        },
       },
       (input, extra) =>
         run(
@@ -191,6 +248,9 @@ export const createMcpServer = (
           destructiveHint: false,
           idempotentHint: true,
         },
+        _meta: {
+          securitySchemes: oauth2SecuritySchemes(['progress:write']),
+        },
       },
       (input, extra) =>
         run(
@@ -206,6 +266,7 @@ export const createMcpServer = (
     );
   }
 
+  exposeRootSecuritySchemes(server);
   return server;
 };
 

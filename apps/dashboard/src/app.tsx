@@ -138,7 +138,7 @@ const PreviewControl = ({
   readonly onChange: (value: StaticPreviewState) => void;
 }) => (
   <label className="preview-control">
-    <span>Static preview</span>
+    <span>Preview state</span>
     <select
       aria-label="Static preview state"
       value={value}
@@ -154,8 +154,9 @@ const PreviewControl = ({
 );
 
 const StaticNotice = ({ state }: { readonly state: StaticPreviewState }) => (
-  <p className="static-notice" role="note">
-    Static fixture preview · {previewLabel(state)} · no live service is connected.
+  <p className="surface-note" role="note">
+    <span className="surface-note-label">Preview mode</span>
+    <span>{previewLabel(state)}. This workspace uses local fixture data.</span>
   </p>
 );
 
@@ -214,8 +215,9 @@ const PlansPage = ({
         description="A clear place to return to the learning paths you have accepted."
       />
       {connected ? (
-        <p className="static-notice" role="note">
-          Connected dashboard · authenticated service data is shown for this workspace.
+        <p className="surface-note" role="note">
+          <span className="surface-note-label">Live service</span>
+          <span>Account data is shown for this workspace.</span>
         </p>
       ) : (
         <StaticNotice state={preview} />
@@ -303,7 +305,7 @@ const DetailPage = ({
     return (
       <>
         <PageHeader title="Loading plan" backHref="/plans" onNavigate={onNavigate} />
-        <LoadingState label="Loading the accepted plan…" />
+        <LoadingState label="Loading the accepted plan..." />
       </>
     );
   }
@@ -370,8 +372,9 @@ const DetailPage = ({
         onNavigate={onNavigate}
       />
       {connected ? (
-        <p className="static-notice" role="note">
-          Connected dashboard · progress is saved by the authenticated service.
+        <p className="surface-note" role="note">
+          <span className="surface-note-label">Live service</span>
+          <span>Progress is saved for this account.</span>
         </p>
       ) : (
         <StaticNotice state={preview} />
@@ -907,8 +910,8 @@ const StaticDashboard = () => {
           />
         )}
         <footer className="page-footer">
-          <span>OpenLearn static dashboard preview</span>
-          <span>Browser-local progress · no live service connected</span>
+          <span>OpenLearn local workspace</span>
+          <span>Progress stays in this browser</span>
         </footer>
       </main>
     </AppShell>
@@ -975,7 +978,7 @@ const ConnectedDashboard = () => {
       setPageMessage(
         error instanceof DashboardApiError
           ? error.message
-          : 'The connected dashboard is unavailable. Try again when ready.',
+          : 'The live workspace is unavailable. Try again when ready.',
       );
     }
   };
@@ -1132,7 +1135,7 @@ const ConnectedDashboard = () => {
         ) : pageState === 'loading' && selectedSnapshot === undefined ? (
           <>
             <PageHeader title="Loading plan" backHref="/plans" onNavigate={navigate} />
-            <LoadingState label="Loading your accepted plan…" />
+            <LoadingState label="Loading your accepted plan..." />
           </>
         ) : selectedSnapshot === undefined ? (
           <UnavailablePage onNavigate={navigate} />
@@ -1166,8 +1169,8 @@ const ConnectedDashboard = () => {
           />
         )}
         <footer className="page-footer">
-          <span>OpenLearn connected dashboard</span>
-          <span>Authenticated service data · server-side progress and deletion</span>
+          <span>OpenLearn live workspace</span>
+          <span>Progress and deletion are saved by the service</span>
         </footer>
       </main>
     </AppShell>

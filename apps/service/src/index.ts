@@ -43,6 +43,8 @@ export interface ServiceConfig {
   readonly rateLimit?: RateLimitOptions;
   readonly metricsPath?: string;
   readonly metricsToken?: string;
+  readonly mcpResourceOrigin?: string;
+  readonly mcpAuthorizationServer?: string;
 }
 
 export interface HttpAuthenticationInput {
@@ -121,6 +123,20 @@ const validateOrigin = (value: string, label: string): string => {
   return parsed.origin;
 };
 
+const validateHttpsEndpoint = (value: string, label: string): string => {
+  const parsed = new URL(value);
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.username !== '' ||
+    parsed.password !== '' ||
+    parsed.search !== '' ||
+    parsed.hash !== ''
+  ) {
+    throw new Error(`${label} must be an HTTPS endpoint.`);
+  }
+  return parsed.toString().replace(/\/$/u, '');
+};
+
 const validateConfig = (config: ServiceConfig): ServiceConfig => {
   const dashboardOrigin = validateOrigin(
     config.dashboardOrigin,
@@ -156,6 +172,20 @@ const validateConfig = (config: ServiceConfig): ServiceConfig => {
   if (config.metricsPath !== undefined && !/^\/[-A-Za-z0-9._~/]*$/u.test(config.metricsPath)) {
     throw new Error('metricsPath must be an absolute path without query parameters.');
   }
+  const mcpResourceOrigin = config.mcpResourceOrigin === undefined
+    ? undefined
+    : validateOrigin(config.mcpResourceOrigin, 'mcpResourceOrigin');
+  const mcpAuthorizationServer = config.mcpAuthorizationServer === undefined
+    ? undefined
+    : validateHttpsEndpoint(
+      config.mcpAuthorizationServer,
+      'mcpAuthorizationServer',
+    );
+  if ((mcpResourceOrigin === undefined) !== (mcpAuthorizationServer === undefined)) {
+    throw new Error(
+      'mcpResourceOrigin and mcpAuthorizationServer must be configured together.',
+    );
+  }
   const allowedOrigins = config.allowedOrigins.map((origin, index) =>
     validateOrigin(origin, `allowedOrigins[${index}]`),
   );
@@ -164,6 +194,8 @@ const validateConfig = (config: ServiceConfig): ServiceConfig => {
     dashboardOrigin,
     allowedOrigins,
     environment,
+    ...(mcpResourceOrigin === undefined ? {} : { mcpResourceOrigin }),
+    ...(mcpAuthorizationServer === undefined ? {} : { mcpAuthorizationServer }),
   };
 };
 
@@ -296,6 +328,17 @@ export const createService = (options: ServiceOptions): OpenLearnService => {
     }
     return { status: 'ok' };
   });
+
+  if (
+    config.mcpResourceOrigin !== undefined &&
+    config.mcpAuthorizationServer !== undefined
+  ) {
+    app.get('/.well-known/oauth-protected-resource', async () => ({
+      resource: config.mcpResourceOrigin,
+      authorization_servers: [config.mcpAuthorizationServer],
+      scopes_supported: ['plan:read', 'plan:write', 'progress:write'],
+    }));
+  }
 
   app.get(config.metricsPath ?? '/metrics', async (request, reply) => {
     if (config.metricsToken !== undefined) {
@@ -456,6 +499,12 @@ export const createService = (options: ServiceOptions): OpenLearnService => {
       actor = undefined;
     }
     if (actor === undefined) {
+      if (config.mcpResourceOrigin !== undefined) {
+        reply.header(
+          'www-authenticate',
+          `Bearer resource_metadata="${config.mcpResourceOrigin}/.well-known/oauth-protected-resource"`,
+        );
+      }
       return reply.code(401).send({ error: 'unauthorized' });
     }
 
@@ -534,6 +583,12 @@ export const serviceConfigFromEnv = (
     },
     metricsPath: env.OPENLEARN_METRICS_PATH ?? '/metrics',
     ...(metricsToken === undefined ? {} : { metricsToken }),
+    ...(env.OPENLEARN_MCP_RESOURCE_ORIGIN === undefined
+      ? {}
+      : { mcpResourceOrigin: env.OPENLEARN_MCP_RESOURCE_ORIGIN }),
+    ...(env.OPENLEARN_MCP_AUTHORIZATION_SERVER === undefined
+      ? {}
+      : { mcpAuthorizationServer: env.OPENLEARN_MCP_AUTHORIZATION_SERVER }),
   };
 };
 

@@ -18,6 +18,7 @@ OpenLearn provides reusable components and a dashboard for plan-shaped content s
 - authenticated connected dashboard reads, progress actions, and plan deletion;
 - provider-neutral OIDC/OAuth verification, PostgreSQL state, operation recovery, and retention maintenance;
 - portable service/dashboard images, Compose topology, CI image gates, and deployment runbooks;
+- a ChatGPT-ready Streamable HTTP connector path with protected-resource metadata, per-tool OAuth scopes, and same-origin proxy routing;
 - repeatable source, type, test, security, accessibility, resilience, and bundle gates.
 
 ## Current status

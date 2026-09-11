@@ -29,8 +29,10 @@ services:
       OPENLEARN_DATABASE_URL: postgres://openlearn:openlearn@database:5432/openlearn
       OPENLEARN_OIDC_ISSUER: https://identity.example.test
       OPENLEARN_OIDC_JWKS_URL: https://identity.example.test/.well-known/jwks.json
-      OPENLEARN_OIDC_AUDIENCE: https://service.example.test/mcp
+      OPENLEARN_OIDC_AUDIENCE: https://service.example.test
       OPENLEARN_DASHBOARD_AUDIENCE: https://dashboard.example.test
+      OPENLEARN_MCP_RESOURCE_ORIGIN: http://localhost:4173
+      OPENLEARN_MCP_AUTHORIZATION_SERVER: https://identity.example.test
       OPENLEARN_SESSION_SECRET: local-compose-secret-change-me-32-bytes
       OPENLEARN_METRICS_TOKEN: local-compose-metrics-token-change-me-32
     depends_on:

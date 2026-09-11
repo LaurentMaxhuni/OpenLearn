@@ -87,6 +87,49 @@ test('advertises only the approved tool names and invokes a structured mutation 
       [...MCP_TOOL_NAMES].sort(),
     );
     assert.equal(tools.tools.some((tool) => tool.description?.includes('learner')), false);
+    const securityByName = new Map(
+      tools.tools.map((tool) => [
+        tool.name,
+        (tool as unknown as {
+          readonly _meta?: { readonly securitySchemes?: unknown };
+        }),
+      ]),
+    );
+    assert.deepEqual(
+      securityByName.get('openlearn.create_plan_view')?._meta?.securitySchemes,
+      [{ type: 'oauth2', scopes: ['plan:write'] }],
+    );
+    const requestHandlers = (
+      connected.server.server as unknown as {
+        readonly _requestHandlers: Map<
+          string,
+          (request: unknown, extra: unknown) => Promise<{
+            readonly tools: readonly Record<string, unknown>[];
+          }>
+        >;
+      }
+    )._requestHandlers;
+    const listToolsHandler = requestHandlers.get('tools/list');
+    assert.notEqual(listToolsHandler, undefined);
+    const wireTools = await listToolsHandler?.(
+      { method: 'tools/list', params: {} },
+      { signal: new AbortController().signal },
+    );
+    const securityOnWire = new Map(
+      wireTools?.tools.map((tool) => [tool.name, tool.securitySchemes]),
+    );
+    assert.deepEqual(
+      securityOnWire.get('openlearn.create_plan_view'),
+      [{ type: 'oauth2', scopes: ['plan:write'] }],
+    );
+    assert.deepEqual(
+      securityOnWire.get('openlearn.get_plan_view'),
+      [{ type: 'oauth2', scopes: ['plan:read'] }],
+    );
+    assert.deepEqual(
+      securityOnWire.get('openlearn.apply_progress_action'),
+      [{ type: 'oauth2', scopes: ['progress:write'] }],
+    );
 
     const result = await connected.client.callTool({
       name: 'openlearn.create_plan_view',

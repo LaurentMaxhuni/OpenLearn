@@ -8,8 +8,10 @@ export {
   applyProgressActionInputSchema,
   createPlanViewInputSchema,
   getPlanViewInputSchema,
+  oauth2SecuritySchemes,
   resultOutputSchema,
   type McpResultEnvelope,
+  type McpOAuthSecurityScheme,
   type McpServerDependencies,
   type McpServerInfo,
 } from './contracts.js';

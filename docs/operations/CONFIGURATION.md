@@ -18,8 +18,10 @@ do not commit a populated `.env` file.
 | `OPENLEARN_DATABASE_POOL_MAX` | no | Maximum application pool size |
 | `OPENLEARN_OIDC_ISSUER` | hosted | Canonical HTTPS issuer shared by dashboard and remote MCP ownership |
 | `OPENLEARN_OIDC_JWKS_URL` | hosted | HTTPS JWKS endpoint for remote bearer verification |
-| `OPENLEARN_OIDC_AUDIENCE` | hosted | Audience/resource accepted by `/mcp` |
+| `OPENLEARN_OIDC_AUDIENCE` | hosted | Audience/resource accepted by `/mcp`; for ChatGPT, use the same canonical value as `OPENLEARN_MCP_RESOURCE_ORIGIN` |
 | `OPENLEARN_DASHBOARD_AUDIENCE` | hosted | Audience used by the signed dashboard session cookie; defaults to the dashboard origin |
+| `OPENLEARN_MCP_RESOURCE_ORIGIN` | ChatGPT OAuth | Canonical public HTTPS resource origin, without the `/mcp` path; configure together with the authorization server |
+| `OPENLEARN_MCP_AUTHORIZATION_SERVER` | ChatGPT OAuth | Exact HTTPS issuer base URL published in protected-resource metadata |
 | `OPENLEARN_SESSION_SECRET` | hosted | At least 32 random bytes for the session verifier |
 | `OPENLEARN_METRICS_PATH` | no | Metrics route; defaults to `/metrics` |
 | `OPENLEARN_METRICS_TOKEN` | production | At least 32 characters; required when `OPENLEARN_ENVIRONMENT=production` |
@@ -30,6 +32,14 @@ do not commit a populated `.env` file.
 The service fails closed when required origins, database, identity, session,
 or production metrics settings are absent. The production database pool uses
 certificate verification (`rejectUnauthorized=true`).
+
+When the two MCP metadata variables are set, the service publishes
+`/.well-known/oauth-protected-resource` and adds a `WWW-Authenticate` discovery
+challenge to unauthenticated `/mcp` requests. The configured authorization
+server still owns login, callback, PKCE, token issuance, and provider-specific
+scope policy. It must return an issuer that exactly matches
+`OPENLEARN_MCP_AUTHORIZATION_SERVER` and issue tokens for the configured
+resource audience.
 
 ## Dashboard build settings
 

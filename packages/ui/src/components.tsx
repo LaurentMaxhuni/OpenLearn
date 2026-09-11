@@ -101,8 +101,8 @@ export const AppShell = ({
     <a className="skip-link" href="#main-content">
       Skip to main content
     </a>
-    <div className="app-frame">
-      <header className="site-header">
+    <div className="app-frame" data-layout="workbench-shell">
+      <header className="site-header" data-region="primary-header">
         <div className="header-inner">
           <a
             className="brand"
@@ -282,7 +282,7 @@ export const ProgressSummary = ({ progress, actionMessage }: ProgressSummaryProp
       </div>
       <p className="progress-detail">
         {progress.inProgressCount > 0
-          ? `${progress.inProgressCount} item${progress.inProgressCount === 1 ? '' : 's'} in progress · ${progress.notStartedCount} not started`
+          ? `${progress.inProgressCount} item${progress.inProgressCount === 1 ? '' : 's'} in progress. ${progress.notStartedCount} not started.`
           : progress.completedCount === progress.totalCount && progress.totalCount > 0
             ? 'All current items are complete.'
             : `${progress.notStartedCount} item${progress.notStartedCount === 1 ? '' : 's'} not started`}
@@ -309,7 +309,7 @@ export const NextActionCard = ({
 }: NextActionCardProps) => {
   const headingId = useScopedId('next-action-heading');
   return (
-    <section className="next-action-card" aria-labelledby={headingId}>
+    <section className="next-action-card" data-region="next-action" aria-labelledby={headingId}>
       <div>
         <p className="eyebrow">Suggested next step</p>
         <h2 id={headingId}>
@@ -460,7 +460,7 @@ export const PlanOutline = ({
   const headingId = `${idPrefix}-heading`;
   const contentId = `${idPrefix}-content`;
   return (
-    <section className="panel outline-panel" aria-labelledby={headingId}>
+    <section className="panel outline-panel" data-region="outline" aria-labelledby={headingId}>
       <div className="section-heading outline-heading">
         <div>
           <p className="eyebrow">The path</p>
@@ -571,6 +571,7 @@ export const PlanItemDetail = ({ item, onProgressAction }: PlanItemDetailProps) 
   return (
     <section
       className="panel focused-panel"
+      data-region="focused-item"
       aria-labelledby={headingId}
       data-focus-target="focused-item"
       tabIndex={-1}
@@ -708,7 +709,7 @@ export const PersonalizationPanel = ({
         aria-atomic="true"
         tabIndex={-1}
       >
-        {personalizationStateLabel(model.state)} · {model.scopeLabel}
+        {personalizationStateLabel(model.state)}. {model.scopeLabel}
       </p>
       <p>{model.explanation}</p>
 
@@ -793,8 +794,8 @@ export const PersonalizationPanel = ({
               <li key={feedback.feedbackId}>
                 <div>
                   <strong>{feedback.areaLabel}: {feedback.valueLabel}</strong>
-                  {feedback.itemLabel === undefined ? null : <span> · {feedback.itemLabel}</span>}
-                  {feedback.status === 'corrected' ? <span> · superseded</span> : null}
+                  {feedback.itemLabel === undefined ? null : <span> ({feedback.itemLabel})</span>}
+                  {feedback.status === 'corrected' ? <span> (superseded)</span> : null}
                 </div>
                 {feedback.status === 'active' ? (
                   <div className="personalization-row-actions">
@@ -854,7 +855,7 @@ export const PersonalizationPanel = ({
               <li key={proposal.proposalId}>
                 <div>
                   <strong>{proposalKindLabel(proposal)}</strong>
-                  <span className="proposal-status"> · {proposal.statusLabel}</span>
+                  <span className="proposal-status">Status: {proposal.statusLabel}</span>
                   <p>{proposal.explanation}</p>
                   <p className="muted">Why this suggestion: {proposal.basis.join(', ')}.</p>
                   {proposal.handoffLabel === undefined ? null : (
@@ -898,7 +899,7 @@ export interface PlanDataControlsProps {
 const deletionStatus = (state: DeletionState): string | undefined => {
   switch (state) {
     case 'submitting':
-      return 'Deleting this plan…';
+      return 'Deleting this plan...';
     case 'recovering':
       return 'We’re checking whether deletion completed.';
     case 'failed_retryable':
@@ -1061,7 +1062,7 @@ export const PlanSummaryCard = ({ plan, onNavigate }: PlanSummaryCardProps) => (
   </li>
 );
 
-export const LoadingState = ({ label = 'Loading your learning workspace…' }: { readonly label?: string }) => (
+export const LoadingState = ({ label = 'Loading your learning workspace...' }: { readonly label?: string }) => (
   <section className="panel state-panel loading-panel" role="status" aria-live="polite">
     <div className="skeleton skeleton-wide" aria-hidden="true" />
     <div className="skeleton skeleton-medium" aria-hidden="true" />
@@ -1126,7 +1127,7 @@ export interface PlanCollectionProps {
 
 export const PlanCollection = ({ model, onNavigate }: PlanCollectionProps) => {
   if (model.pageState === 'loading') {
-    return <LoadingState label="Loading your plans…" />;
+    return <LoadingState label="Loading your plans..." />;
   }
   if (model.pageState === 'empty') {
     return (
@@ -1144,16 +1145,44 @@ export const PlanCollection = ({ model, onNavigate }: PlanCollectionProps) => {
       />
     );
   }
+  const continuationPlan = model.plans.find((plan) => plan.nextAction !== undefined) ?? model.plans[0];
   return (
-    <ol className="plan-list" aria-label="Your learning plans">
-      {model.plans.map((plan) => (
-        <PlanSummaryCard
-          key={plan.planId}
-          plan={plan}
-          {...(onNavigate === undefined ? {} : { onNavigate })}
-        />
-      ))}
-    </ol>
+    <>
+      {continuationPlan === undefined ? null : (
+        <section
+          className="continue-card"
+          data-region="continue-here"
+          aria-labelledby="continue-here-heading"
+        >
+          <div>
+            <p className="eyebrow">Continue here</p>
+            <p className="continue-plan">{continuationPlan.title}</p>
+            <h2 id="continue-here-heading">
+              {continuationPlan.nextAction?.title ?? 'Review your completed plan'}
+            </h2>
+            <p>
+              {continuationPlan.nextAction?.description ?? continuationPlan.goalSummary}
+            </p>
+          </div>
+          <a
+            className="button button-primary"
+            href={continuationPlan.href}
+            onClick={(event) => navigationClick(event, continuationPlan.href, onNavigate)}
+          >
+            Open plan <span aria-hidden="true">→</span>
+          </a>
+        </section>
+      )}
+      <ol className="plan-list" aria-label="Your learning plans">
+        {model.plans.map((plan) => (
+          <PlanSummaryCard
+            key={plan.planId}
+            plan={plan}
+            {...(onNavigate === undefined ? {} : { onNavigate })}
+          />
+        ))}
+      </ol>
+    </>
   );
 };
 
@@ -1199,13 +1228,31 @@ export const DashboardDetail = ({
   onAcceptProposal,
   onRejectProposal,
 }: DashboardDetailProps) => (
-  <>
+  <div className="detail-view" data-layout="detail-workbench">
     <TrustStateBanner
       surfaceState={model.surfaceState}
       trust={model.trust}
       {...(model.operation === undefined ? {} : { operation: model.operation })}
       {...(model.recovery === undefined ? {} : { recovery: model.recovery })}
     />
+    <NextActionCard
+      {...(model.nextAction === undefined ? {} : { nextAction: model.nextAction })}
+      {...(onSelectItem === undefined ? {} : { onSelect: onSelectItem })}
+      disabled={model.operation !== undefined}
+    />
+    <div className="dashboard-workspace">
+      <PlanItemDetail
+        {...(model.focusedItem === undefined ? {} : { item: model.focusedItem })}
+        {...(onProgressAction === undefined ? {} : { onProgressAction })}
+      />
+      <PlanOutline
+        nodes={model.outline}
+        {...(model.focusedItem === undefined
+          ? {}
+          : { focusedItemId: model.focusedItem.itemId })}
+        {...(onSelectItem === undefined ? {} : { onSelectItem })}
+      />
+    </div>
     <div className="dashboard-summary">
       <GoalContext
         {...(model.goal === undefined ? {} : { goal: model.goal })}
@@ -1216,11 +1263,6 @@ export const DashboardDetail = ({
         {...(model.progressMessage === undefined
           ? {}
           : { actionMessage: model.progressMessage })}
-      />
-      <NextActionCard
-        {...(model.nextAction === undefined ? {} : { nextAction: model.nextAction })}
-        {...(onSelectItem === undefined ? {} : { onSelect: onSelectItem })}
-        disabled={model.operation !== undefined}
       />
     </div>
     {model.personalization === undefined ? null : (
@@ -1237,19 +1279,6 @@ export const DashboardDetail = ({
         {...(onRejectProposal === undefined ? {} : { onRejectProposal })}
       />
     )}
-    <div className="dashboard-workspace">
-      <PlanOutline
-        nodes={model.outline}
-        {...(model.focusedItem === undefined
-          ? {}
-          : { focusedItemId: model.focusedItem.itemId })}
-        {...(onSelectItem === undefined ? {} : { onSelectItem })}
-      />
-      <PlanItemDetail
-        {...(model.focusedItem === undefined ? {} : { item: model.focusedItem })}
-        {...(onProgressAction === undefined ? {} : { onProgressAction })}
-      />
-    </div>
     {model.dataControls === undefined ? null : (
       <PlanDataControls
         controls={model.dataControls}
@@ -1258,5 +1287,5 @@ export const DashboardDetail = ({
         {...(onRefresh === undefined ? {} : { onRefresh })}
       />
     )}
-  </>
+  </div>
 );

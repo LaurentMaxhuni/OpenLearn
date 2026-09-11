@@ -6,6 +6,7 @@ The service provides:
 
 - `/health/live` and dependency-driven `/health/ready` endpoints;
 - a `/mcp` Streamable HTTP endpoint using the official SDK, with an Origin allowlist and HTTP authentication checked before constructing the actor-bound MCP server; and
+- OAuth protected-resource metadata at `/.well-known/oauth-protected-resource` plus a `WWW-Authenticate` discovery challenge when MCP metadata is configured;
 - authenticated `/api/plans` reads, progress, and deletion with dashboard-session CSRF protection;
 - protected Prometheus-style metrics, request IDs, security headers, and a bounded per-instance rate guard;
 - `startStdio`, which authenticates a local actor, connects the official stdio transport, and writes its startup diagnostic to `stderr`; and

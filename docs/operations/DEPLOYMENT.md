@@ -54,9 +54,13 @@ application rollback.
 
 Inject the values in [Configuration](CONFIGURATION.md), including the exact
 dashboard origin, allowed origin list, database URL, OIDC issuer/JWKS/audience,
-session secret, and production metrics token. Set `OPENLEARN_TRUST_PROXY=true`
-only when the service is reachable solely through a trusted ingress that
-rewrites forwarding headers.
+session secret, and production metrics token. For a ChatGPT connector, also set
+`OPENLEARN_MCP_RESOURCE_ORIGIN` to the public HTTPS origin without `/mcp` and
+`OPENLEARN_MCP_AUTHORIZATION_SERVER` to the exact HTTPS issuer base URL. Keep
+`OPENLEARN_OIDC_AUDIENCE` equal to the resource origin so the token audience
+matches the OAuth resource. Set `OPENLEARN_TRUST_PROXY=true` only when the
+service is reachable solely through a trusted ingress that rewrites forwarding
+headers.
 
 Start the service image and wait for:
 
@@ -81,7 +85,51 @@ connected mode, `/api/csrf` returns a token only for an allowed origin, and a
 same-owner plan can be listed, opened, progressed, and deleted. Confirm that a
 different owner receives a non-disclosing unavailable result.
 
-## 6. Smoke test and handoff
+## 6. Connect it to ChatGPT
+
+OpenLearn keeps the browser dashboard and MCP endpoint on the same public
+origin in the supplied Nginx topology. The ingress must route `/api/*`, `/mcp`,
+and `/.well-known/oauth-protected-resource` to the service, while routing the
+remaining paths to the dashboard. Do not let `/mcp` fall through to
+`index.html`.
+
+Verify the connector-facing surface before opening ChatGPT:
+
+```powershell
+curl.exe -i https://learn.example.com/.well-known/oauth-protected-resource
+curl.exe -i -X POST https://learn.example.com/mcp `
+  -H "Accept: application/json, text/event-stream" `
+  -H "Content-Type: application/json" `
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+```
+
+The metadata response must contain the canonical `resource`, the configured
+authorization server, and the three supported OpenLearn scopes. The second
+request should be a safe `401` with a `WWW-Authenticate` header pointing to
+the metadata URL.
+
+The official ChatGPT flow is:
+
+1. Configure the identity provider for OAuth 2.1 authorization-code plus PKCE
+   with `S256`, the exact issuer, the authorization and token endpoints, and
+   the redirect URI shown by ChatGPT’s connector management screen. OpenLearn
+   supplies the resource-server verification boundary, not a provider-specific
+   login or callback implementation.
+2. In ChatGPT, enable Developer mode under Settings, then create a connector
+   from the Apps and Connectors area using `https://learn.example.com/mcp` as
+   the public Streamable HTTP endpoint.
+3. Review the discovered tool names, descriptions, annotations, and OAuth
+   scopes. Test a read request, a direct plan handoff, a progress action, and a
+   follow-up request against a test learner before sharing the connector.
+
+See OpenAI’s [MCP server guide](https://developers.openai.com/plugins/build/mcp-server),
+[authentication guide](https://developers.openai.com/plugins/build/auth), and
+[ChatGPT connection guide](https://developers.openai.com/plugins/deploy/connect-chatgpt)
+for the current connector UI and OAuth metadata requirements. Public HTTPS is
+required for a hosted connector; a local tunnel is useful only for development
+testing.
+
+## 7. Smoke test and handoff
 
 Record the commit/image digests, migration result, identity configuration
 version, database backup identifier, health responses, and metrics scrape
