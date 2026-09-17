@@ -314,9 +314,29 @@ export const createPostgresApplicationState = (
     return result.rows.map((row) => decodePlan(row.aggregate));
   };
 
+  const findRetainedOperation = async (
+    input: OperationReservationInput,
+  ): Promise<OperationRecord | undefined> => {
+    const marker = await pool.query(
+      `SELECT operation_id, operation_kind AS kind, owner_id, capability, idempotency_key, request_fingerprint,
+              outcome, created_at AS started_at, created_at AS deadline_at, created_at AS lease_expires_at,
+              0 AS fencing_version, NULL AS state
+       FROM openlearn_mutation_markers WHERE ${operationKeyWhere}`,
+      [input.ownerId, input.capability, input.idempotencyKey],
+    );
+    const row = marker.rows[0];
+    if (row === undefined) return undefined;
+    const reference = referenceFromRow(row);
+    return operationFromRow({ ...row, state: reference.outcome.state });
+  };
+
   const reserveOperation = async (
     input: OperationReservationInput,
   ): Promise<OperationReservation> => {
+    const retained = await findRetainedOperation(input);
+    if (retained !== undefined) {
+      return { kind: 'existing', operation: retained };
+    }
     const now = currentTime(clock).toISOString();
     const inserted = await pool.query(
       `INSERT INTO openlearn_operations
@@ -352,26 +372,9 @@ export const createPostgresApplicationState = (
       return { kind: 'existing', operation: operationFromRow(existingRow) };
     }
 
-    const marker = await pool.query(
-      `SELECT operation_id, operation_kind AS kind, owner_id, capability, idempotency_key, request_fingerprint,
-              outcome, created_at AS started_at, created_at AS deadline_at, created_at AS lease_expires_at,
-              0 AS fencing_version, NULL AS state
-       FROM openlearn_mutation_markers WHERE ${operationKeyWhere}`,
-      [input.ownerId, input.capability, input.idempotencyKey],
-    );
-    const markerRow = marker.rows[0];
-    if (markerRow !== undefined) {
-      const reference = referenceFromRow(markerRow);
-      return {
-        kind: 'existing',
-        operation: {
-          ...operationFromRow({
-            ...markerRow,
-            state: reference.outcome.state,
-          }),
-          outcome: reference.outcome,
-        },
-      };
+    const retainedAfterInsert = await findRetainedOperation(input);
+    if (retainedAfterInsert !== undefined) {
+      return { kind: 'existing', operation: retainedAfterInsert };
     }
     throw new PersistenceConcurrencyError('Operation reservation disappeared during insert.');
   };
