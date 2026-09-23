@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { PlanView } from '@openlearn/application';
+import type { ApplyProgressActionInput, DeletePlanInput, PlanSummary, PlanView } from '@openlearn/application';
 import {
   changePersonalizationConsent,
   correctLearnerFeedback,
@@ -45,6 +45,7 @@ import {
   type AcceptedPlanSnapshotInput,
   safePlanHref,
   toPlanDetailViewModel,
+  toPlanListViewModelFromSummaries,
   toPlanListViewModel,
 } from './view-model.js';
 import { routeForPath } from './router.js';
@@ -163,14 +164,18 @@ const StaticNotice = ({ state }: { readonly state: StaticPreviewState }) => (
 const PlansPage = ({
   preview,
   snapshots,
+  summaries,
   onNavigate,
+  onRefresh,
   connected = false,
   pageState,
   pageMessage,
 }: {
   readonly preview: StaticPreviewState;
   readonly snapshots: readonly AcceptedPlanSnapshotInput[];
+  readonly summaries?: readonly PlanSummary[];
   readonly onNavigate: (href: string) => void;
+  readonly onRefresh?: () => void;
   readonly connected?: boolean;
   readonly pageState?: 'loading' | 'ready' | 'error';
   readonly pageMessage?: string;
@@ -188,14 +193,16 @@ const PlansPage = ({
   );
   const model =
     pageState === 'loading'
-      ? { pageState: 'loading' as const, plans: [] }
-      : pageState === 'error'
+          ? { pageState: 'loading' as const, plans: [] }
+          : pageState === 'error'
         ? {
             pageState: 'error' as const,
             pageMessage: pageMessage ?? 'Try again or refresh when you are ready.',
             plans: [],
           }
-        : preview === 'empty'
+        : summaries !== undefined
+          ? toPlanListViewModelFromSummaries(summaries)
+          : preview === 'empty'
           ? toPlanListViewModel([])
           : preview === 'loading'
             ? { pageState: 'loading' as const, plans: [] }
@@ -222,7 +229,11 @@ const PlansPage = ({
       ) : (
         <StaticNotice state={preview} />
       )}
-      <PlanCollection model={model} onNavigate={onNavigate} />
+      <PlanCollection
+        model={model}
+        onNavigate={onNavigate}
+        {...(onRefresh === undefined ? {} : { onRetry: onRefresh })}
+      />
     </>
   );
 };
@@ -379,6 +390,9 @@ const DetailPage = ({
       ) : (
         <StaticNotice state={preview} />
       )}
+      {connected && personalization === undefined && personalizationMessage !== undefined ? (
+        <p className="surface-note" role="status">{personalizationMessage}</p>
+      ) : null}
       <DashboardDetail
         model={detail}
         onSelectItem={onSelectItem}
@@ -948,15 +962,30 @@ const ConnectedDashboard = () => {
       }),
     [],
   );
+  const [summaries, setSummaries] = useState<readonly PlanSummary[]>([]);
   const [snapshots, setSnapshots] = useState<readonly AcceptedPlanSnapshotInput[]>([]);
   const [pageState, setPageState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [pageMessage, setPageMessage] = useState<string | undefined>();
   const [pathname, setPathname] = useState(() => window.location.pathname);
+  const [detailLoading, setDetailLoading] = useState(
+    () => routeForPath(window.location.pathname).kind === 'plan',
+  );
+  const [detailMessages, setDetailMessages] = useState<Readonly<Record<string, string>>>({});
   const [focusedItemId, setFocusedItemId] = useState<string | undefined>();
   const [actionStatesByPlan, setActionStatesByPlan] = useState<ActionStatesByPlan>({});
   const [deletionState, setDeletionState] = useState<DeletionState>('available');
   const [progressMessages, setProgressMessages] = useState<Readonly<Record<string, string>>>({});
+  const [personalizationByPlan, setPersonalizationByPlan] = useState<
+    Readonly<Record<string, PersonalizationState>>
+  >({});
+  const [personalizationMessages, setPersonalizationMessages] = useState<
+    Readonly<Record<string, string>>
+  >({});
   const hasNavigatedRef = useRef(false);
+  const loadControllerRef = useRef<AbortController | undefined>(undefined);
+  const progressInputsRef = useRef(new Map<string, ApplyProgressActionInput>());
+  const deleteInputsRef = useRef(new Map<string, DeletePlanInput>());
+  const [detailRefreshVersion, setDetailRefreshVersion] = useState(0);
 
   const snapshotsById = useMemo(
     () => new Map(snapshots.map((snapshot) => [snapshot.planId, snapshot])),
@@ -964,16 +993,21 @@ const ConnectedDashboard = () => {
   );
 
   const load = async (): Promise<void> => {
+    loadControllerRef.current?.abort();
+    const controller = new AbortController();
+    loadControllerRef.current = controller;
     setPageState('loading');
     try {
-      const views = await client.listPlanViews();
-      setSnapshots(views.map(snapshotFromView));
+      const nextSummaries = await client.listPlanSummaries(controller.signal);
+      if (controller.signal.aborted) return;
+      setSummaries(nextSummaries);
       setPageState('ready');
       setPageMessage(undefined);
       setActionStatesByPlan({});
       setProgressMessages({});
       setDeletionState('available');
     } catch (error) {
+      if (controller.signal.aborted) return;
       setPageState('error');
       setPageMessage(
         error instanceof DashboardApiError
@@ -985,6 +1019,7 @@ const ConnectedDashboard = () => {
 
   useEffect(() => {
     void load();
+    return () => loadControllerRef.current?.abort();
   }, [client]);
 
   useEffect(() => {
@@ -1012,8 +1047,218 @@ const ConnectedDashboard = () => {
   const selectedPlanId = route.kind === 'plan' ? route.planId : undefined;
   const selectedSnapshot =
     selectedPlanId === undefined ? undefined : snapshotsById.get(selectedPlanId);
+  const selectedPersonalization =
+    selectedPlanId === undefined ? undefined : personalizationByPlan[selectedPlanId];
+
+  useEffect(() => {
+    if (selectedPlanId === undefined) {
+      setDetailLoading(false);
+      return;
+    }
+    if (selectedSnapshot !== undefined && detailRefreshVersion === 0) {
+      setDetailLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    let active = true;
+    setDetailLoading(true);
+    setDetailMessages((messages) => ({ ...messages, [selectedPlanId]: '' }));
+    void client.getPlanView(selectedPlanId, controller.signal).then((view) => {
+      if (!active) return;
+      const snapshot = snapshotFromView(view);
+      setSnapshots((current) => [
+        ...current.filter((entry) => entry.planId !== snapshot.planId),
+        snapshot,
+      ]);
+      setDetailMessages((messages) => ({ ...messages, [selectedPlanId]: '' }));
+    }).catch((error: unknown) => {
+      if (!active || controller.signal.aborted) return;
+      setDetailMessages((messages) => ({
+        ...messages,
+        [selectedPlanId]: error instanceof DashboardApiError
+          ? error.message
+          : 'The plan could not be loaded. Try again when ready.',
+      }));
+    }).finally(() => {
+      if (active) setDetailLoading(false);
+    });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [client, selectedPlanId, detailRefreshVersion]);
+
+  useEffect(() => {
+    if (selectedPlanId === undefined || selectedSnapshot === undefined) return;
+    const controller = new AbortController();
+    let active = true;
+    void client.getPersonalization(selectedPlanId, controller.signal).then((state) => {
+      if (!active) return;
+      setPersonalizationByPlan((current) => ({ ...current, [selectedPlanId]: state }));
+      setPersonalizationMessages((current) => ({ ...current, [selectedPlanId]: '' }));
+    }).catch((error: unknown) => {
+      if (!active || controller.signal.aborted) return;
+      setPersonalizationMessages((current) => ({
+        ...current,
+        [selectedPlanId]: error instanceof DashboardApiError
+          ? error.message
+          : 'Personalization settings could not be loaded.',
+      }));
+    });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [client, selectedPlanId, selectedSnapshot?.revisionId]);
 
   const selectItem = (itemId: string) => setFocusedItemId(itemId);
+
+  const submitPersonalization = async (
+    planId: string,
+    mutate: () => Promise<unknown>,
+    successMessage: string,
+    refreshSuggestions = false,
+  ): Promise<void> => {
+    let committed = false;
+    try {
+      await mutate();
+      committed = true;
+      let state = await client.getPersonalization(planId);
+      if (refreshSuggestions && state.consent.state === 'enabled') {
+        try {
+          state = (await client.evaluatePersonalization({
+            planId,
+            expectedStateVersion: state.stateVersion,
+          })).state;
+        } catch {
+          setPersonalizationByPlan((current) => ({ ...current, [planId]: state }));
+          setPersonalizationMessages((current) => ({
+            ...current,
+            [planId]: `${successMessage} Suggestions could not be refreshed.`,
+          }));
+          return;
+        }
+      }
+      setPersonalizationByPlan((current) => ({ ...current, [planId]: state }));
+      setPersonalizationMessages((current) => ({ ...current, [planId]: successMessage }));
+    } catch (error) {
+      const conflict = error instanceof DashboardApiError && error.status === 409;
+      setPersonalizationMessages((current) => ({
+        ...current,
+        [planId]: committed
+          ? `${successMessage} The latest settings could not be refreshed. Refresh before making another change.`
+          : error instanceof DashboardApiError
+            ? error.message
+            : 'Personalization could not be saved. Try again when ready.',
+      }));
+      if (committed || conflict) {
+        try {
+          const latest = await client.getPersonalization(planId);
+          setPersonalizationByPlan((current) => ({ ...current, [planId]: latest }));
+        } catch {
+          // Keep the current view and let the learner refresh after the service recovers.
+        }
+      }
+    }
+  };
+
+  const changeConnectedConsent = async (
+    action: 'enable' | 'pause' | 'resume' | 'revoke',
+  ): Promise<void> => {
+    if (selectedPlanId === undefined || selectedPersonalization === undefined) return;
+    const message = action === 'enable'
+      ? 'Suggestions enabled for this plan.'
+      : action === 'pause'
+        ? 'Suggestions paused. Confirmed progress is unchanged.'
+        : action === 'resume'
+          ? 'Suggestions resumed.'
+          : 'Personalization disabled. Feedback is no longer used for suggestions.';
+    await submitPersonalization(
+      selectedPlanId,
+      () => client.changePersonalizationConsent({
+        planId: selectedPlanId,
+        action,
+        expectedStateVersion: selectedPersonalization.stateVersion,
+      }),
+      message,
+      action === 'enable' || action === 'resume',
+    );
+  };
+
+  const recordConnectedFeedback = async (
+    area: PersonalizationFeedbackArea,
+    value: string,
+  ): Promise<void> => {
+    if (selectedPlanId === undefined || selectedPersonalization === undefined) return;
+    await submitPersonalization(
+      selectedPlanId,
+      () => client.recordLearnerFeedback({
+        planId: selectedPlanId,
+        ...(focusedItemId === undefined ? {} : { itemId: focusedItemId }),
+        area,
+        value,
+        expectedStateVersion: selectedPersonalization.stateVersion,
+      }),
+      'Feedback saved for this plan.',
+      true,
+    );
+  };
+
+  const correctConnectedFeedback = async (
+    feedbackId: string,
+    area: PersonalizationFeedbackArea,
+    value: string,
+  ): Promise<void> => {
+    if (selectedPlanId === undefined || selectedPersonalization === undefined) return;
+    await submitPersonalization(
+      selectedPlanId,
+      () => client.correctLearnerFeedback({
+        planId: selectedPlanId,
+        feedbackId,
+        area,
+        value,
+        expectedStateVersion: selectedPersonalization.stateVersion,
+      }),
+      'Feedback corrected. Suggestions use the updated value.',
+      true,
+    );
+  };
+
+  const deleteConnectedFeedback = async (feedbackId: string): Promise<void> => {
+    if (selectedPlanId === undefined || selectedPersonalization === undefined) return;
+    await submitPersonalization(
+      selectedPlanId,
+      () => client.deleteLearnerFeedback({
+        planId: selectedPlanId,
+        feedbackId,
+        expectedStateVersion: selectedPersonalization.stateVersion,
+      }),
+      'Feedback deleted and removed from future suggestions.',
+      true,
+    );
+  };
+
+  const decideConnectedProposal = async (
+    proposalId: string,
+    proposalVersion: number,
+    decision: 'accept' | 'reject',
+  ): Promise<void> => {
+    if (selectedPlanId === undefined || selectedPersonalization === undefined) return;
+    const message = decision === 'reject'
+      ? 'Suggestion marked not useful. Your accepted plan is unchanged.'
+      : 'Suggestion accepted for the connected AI client. Your accepted plan is unchanged.';
+    await submitPersonalization(
+      selectedPlanId,
+      () => client.decidePersonalizationProposal({
+        planId: selectedPlanId,
+        proposalId,
+        decision,
+        expectedStateVersion: selectedPersonalization.stateVersion,
+        expectedProposalVersion: proposalVersion,
+      }),
+      message,
+    );
+  };
 
   useEffect(() => {
     if (focusedItemId === undefined) return;
@@ -1046,11 +1291,16 @@ const ConnectedDashboard = () => {
         : action === 'complete'
           ? 'complete_item'
           : 'undo_completion';
-    setActionStatesByPlan((states) =>
-      setActionState(states, selectedPlanId, itemId, 'submitting'),
-    );
-    try {
-      await client.applyProgressAction({
+    const operationKey = [
+      snapshot.planId,
+      itemId,
+      apiAction,
+      snapshot.revisionId,
+      currentProgress?.progressVersion ?? 0,
+    ].join(':');
+    let input = progressInputsRef.current.get(operationKey);
+    if (input === undefined) {
+      input = {
         planId: snapshot.planId,
         itemId,
         action: apiAction,
@@ -1058,11 +1308,21 @@ const ConnectedDashboard = () => {
         expectedProgressVersion: currentProgress?.progressVersion ?? 0,
         idempotencyKey: connectedOperationKey('progress'),
         confirmedAt: new Date().toISOString(),
-      });
+      };
+      progressInputsRef.current.set(operationKey, input);
+    }
+    setActionStatesByPlan((states) =>
+      setActionState(states, selectedPlanId, itemId, 'submitting'),
+    );
+    let mutationConfirmed = false;
+    try {
+      await client.applyProgressAction(input);
+      mutationConfirmed = true;
       const updated = snapshotFromView(await client.getPlanView(snapshot.planId));
       setSnapshots((current) =>
         current.map((entry) => (entry.planId === updated.planId ? updated : entry)),
       );
+      progressInputsRef.current.delete(operationKey);
       setActionStatesByPlan((states) =>
         setActionState(states, selectedPlanId, itemId, 'available'),
       );
@@ -1070,20 +1330,29 @@ const ConnectedDashboard = () => {
         ...messages,
         [selectedPlanId]: 'Confirmed progress was saved by the service.',
       }));
+      void client.listPlanSummaries().then(setSummaries).catch(() => {
+        setProgressMessages((messages) => ({
+          ...messages,
+          [selectedPlanId]: 'Progress was saved. The plan list could not be refreshed.',
+        }));
+      });
     } catch (error) {
       const conflict = error instanceof DashboardApiError && error.status === 409;
+      if (conflict) progressInputsRef.current.delete(operationKey);
       setActionStatesByPlan((states) =>
         setActionState(
           states,
           selectedPlanId,
           itemId,
-          conflict ? 'conflict' : 'failed_retryable',
+          conflict || mutationConfirmed ? 'conflict' : 'failed_retryable',
         ),
       );
       setProgressMessages((messages) => ({
         ...messages,
         [selectedPlanId]:
-          error instanceof DashboardApiError
+          mutationConfirmed
+            ? 'Progress was saved. Refresh to load its latest state before continuing.'
+            : error instanceof DashboardApiError
             ? error.message
             : 'Progress could not be saved. Try again when ready.',
       }));
@@ -1094,28 +1363,35 @@ const ConnectedDashboard = () => {
     if (selectedPlanId === undefined) return;
     const snapshot = snapshotsById.get(selectedPlanId);
     if (snapshot === undefined) return;
-    setDeletionState('submitting');
-    try {
-      await client.deletePlan({
+    const operationKey = `${snapshot.planId}:${snapshot.revisionId}`;
+    let input = deleteInputsRef.current.get(operationKey);
+    if (input === undefined) {
+      input = {
         planId: snapshot.planId,
         expectedRevisionId: snapshot.revisionId,
         idempotencyKey: connectedOperationKey('delete'),
         deletedAt: new Date().toISOString(),
-      });
+      };
+      deleteInputsRef.current.set(operationKey, input);
+    }
+    setDeletionState('submitting');
+    try {
+      await client.deletePlan(input);
+      deleteInputsRef.current.delete(operationKey);
       setDeletionState('deleted');
       setSnapshots((current) => current.filter((entry) => entry.planId !== snapshot.planId));
+      setSummaries((current) => current.filter((entry) => entry.planId !== snapshot.planId));
       navigate('/plans');
     } catch (error) {
-      setDeletionState(
-        error instanceof DashboardApiError && error.status === 409
-          ? 'conflict'
-          : 'failed_retryable',
-      );
+      const conflict = error instanceof DashboardApiError && error.status === 409;
+      if (conflict) deleteInputsRef.current.delete(operationKey);
+      setDeletionState(conflict ? 'conflict' : 'failed_retryable');
     }
   };
 
   const refresh = () => {
     void load();
+    setDetailRefreshVersion((version) => version + 1);
   };
 
   return (
@@ -1127,18 +1403,25 @@ const ConnectedDashboard = () => {
           <PlansPage
             preview="accepted"
             snapshots={snapshots}
+            summaries={summaries}
             onNavigate={navigate}
+            onRefresh={refresh}
             connected
             pageState={pageState}
             {...(pageMessage === undefined ? {} : { pageMessage })}
           />
-        ) : pageState === 'loading' && selectedSnapshot === undefined ? (
+        ) : (pageState === 'loading' || detailLoading) && selectedSnapshot === undefined ? (
           <>
             <PageHeader title="Loading plan" backHref="/plans" onNavigate={navigate} />
             <LoadingState label="Loading your accepted plan..." />
           </>
         ) : selectedSnapshot === undefined ? (
-          <UnavailablePage onNavigate={navigate} />
+          <>
+            <UnavailablePage onNavigate={navigate} />
+            {selectedPlanId !== undefined && detailMessages[selectedPlanId] !== undefined ? (
+              <p className="surface-note" role="status">{detailMessages[selectedPlanId]}</p>
+            ) : null}
+          </>
         ) : (
           <DetailPage
             planId={selectedSnapshot.planId}
@@ -1150,6 +1433,12 @@ const ConnectedDashboard = () => {
             {...(progressMessages[selectedSnapshot.planId] === undefined
               ? {}
               : { progressMessage: progressMessages[selectedSnapshot.planId] })}
+            {...(selectedPersonalization === undefined
+              ? {}
+              : { personalization: selectedPersonalization })}
+            {...(personalizationMessages[selectedSnapshot.planId] === undefined
+              ? {}
+              : { personalizationMessage: personalizationMessages[selectedSnapshot.planId] })}
             connected
             onNavigate={navigate}
             onSelectItem={selectItem}
@@ -1157,15 +1446,18 @@ const ConnectedDashboard = () => {
             onConfirmDelete={() => void confirmDelete()}
             onRetryDelete={() => setDeletionState('available')}
             onRefresh={refresh}
-            onEnablePersonalization={() => undefined}
-            onPausePersonalization={() => undefined}
-            onResumePersonalization={() => undefined}
-            onDisablePersonalization={() => undefined}
-            onRecordFeedback={() => undefined}
-            onCorrectFeedback={() => undefined}
-            onDeleteFeedback={() => undefined}
-            onAcceptProposal={() => undefined}
-            onRejectProposal={() => undefined}
+            onEnablePersonalization={() => void changeConnectedConsent('enable')}
+            onPausePersonalization={() => void changeConnectedConsent('pause')}
+            onResumePersonalization={() => void changeConnectedConsent('resume')}
+            onDisablePersonalization={() => void changeConnectedConsent('revoke')}
+            onRecordFeedback={(area, value) => void recordConnectedFeedback(area, value)}
+            onCorrectFeedback={(feedbackId, area, value) =>
+              void correctConnectedFeedback(feedbackId, area, value)}
+            onDeleteFeedback={(feedbackId) => void deleteConnectedFeedback(feedbackId)}
+            onAcceptProposal={(proposalId, proposalVersion) =>
+              void decideConnectedProposal(proposalId, proposalVersion, 'accept')}
+            onRejectProposal={(proposalId, proposalVersion) =>
+              void decideConnectedProposal(proposalId, proposalVersion, 'reject')}
           />
         )}
         <footer className="page-footer">

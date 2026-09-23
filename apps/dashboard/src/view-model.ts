@@ -4,6 +4,7 @@ import type {
   PersonalizationProposal,
   PersonalizationState,
 } from '@openlearn/domain';
+import type { PlanSummary } from '@openlearn/application';
 import type {
   ContentState,
   ContextViewModel,
@@ -571,4 +572,45 @@ export const toPlanListViewModel = (
     ? { pageMessage: 'A connected AI client can supply your first learning plan.' }
     : {}),
   plans: entries.map(toPlanSummaryViewModel),
+});
+
+export const toPlanListViewModelFromSummaries = (
+  summaries: readonly PlanSummary[],
+): PlanListViewModel => ({
+  pageState: summaries.length === 0 ? 'empty' : 'ready',
+  ...(summaries.length === 0
+    ? { pageMessage: 'A connected AI client can supply your first learning plan.' }
+    : {}),
+  plans: summaries.map((summary) => ({
+    planId: summary.planId,
+    href: safePlanHref(summary.planId),
+    title: summary.title ?? summary.goalTitle,
+    goalSummary: summary.goalDescription ?? summary.goalTitle,
+    contentState: 'accepted',
+    progress: {
+      completedCount: summary.progressSummary.completedCount,
+      totalCount: summary.progressSummary.totalCount,
+      inProgressCount: summary.progressSummary.inProgressCount,
+      notStartedCount: summary.progressSummary.notStartedCount,
+      label: progressLabel(
+        summary.progressSummary.completedCount,
+        summary.progressSummary.totalCount,
+      ),
+      learnerConfirmed:
+        summary.progressSummary.completedCount > 0 ||
+        summary.progressSummary.inProgressCount > 0,
+    },
+    ...(summary.nextItemId === undefined
+      ? {}
+      : {
+          nextAction: {
+            itemId: summary.nextItemId,
+            title: summary.nextItemTitle ?? 'Continue this plan',
+            ...(summary.nextItemDescription === undefined
+              ? {}
+              : { description: summary.nextItemDescription }),
+          },
+        }),
+    updatedAt: summary.acceptedAt,
+  })),
 });

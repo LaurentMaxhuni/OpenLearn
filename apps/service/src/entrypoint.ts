@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   createApplication,
+  createPersonalizationApplication,
   type ActorContext,
   type Clock,
   type OperationIdGenerator,
@@ -76,9 +77,10 @@ export const startHostedService = async (
   const resolver = createPostgresPrincipalResolver({ pool, clock });
   const metrics = createServiceMetrics();
   const telemetry = createRedactedTelemetrySink({ metrics });
+  const allocator = createAllocator();
   const applicationWithTelemetry = createApplication({
     state,
-    allocator: createAllocator(),
+    allocator,
     clock,
     operationIds,
     telemetry,
@@ -96,6 +98,13 @@ export const startHostedService = async (
     getPlanView: applicationWithTelemetry.getPlanView,
     applyProgressAction: applicationWithTelemetry.applyProgressAction,
     deletePlan: applicationWithTelemetry.deletePlan,
+    personalization: createPersonalizationApplication({
+      planReader: state,
+      state,
+      allocator,
+      clock,
+      operationIds,
+    }),
   };
   const httpAuthenticator = createOidcAuthenticator({
     issuer,

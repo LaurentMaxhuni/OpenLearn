@@ -366,6 +366,12 @@ export const createApplication = (
           },
         );
       }
+      const nextItem = snapshot.value.nextItemId === undefined
+        ? undefined
+        : plan.content.milestones
+            .flatMap((milestone) => milestone.topics)
+            .flatMap((topic) => topic.items)
+            .find((item) => item.itemId === snapshot.value.nextItemId);
       summaries.push({
         planId: snapshot.value.planId,
         revisionId: snapshot.value.revisionId,
@@ -375,10 +381,23 @@ export const createApplication = (
           ? {}
           : { title: snapshot.value.content.title }),
         goalTitle: snapshot.value.content.goal.title,
+        ...(snapshot.value.content.goal.description === undefined
+          ? {}
+          : { goalDescription: snapshot.value.content.goal.description }),
         progressSummary: snapshot.value.progressSummary,
         ...(snapshot.value.nextItemId === undefined
           ? {}
-          : { nextItemId: snapshot.value.nextItemId }),
+          : {
+              nextItemId: snapshot.value.nextItemId,
+              ...(nextItem === undefined
+                ? {}
+                : {
+                    nextItemTitle: nextItem.title,
+                    ...(nextItem.description === undefined
+                      ? {}
+                      : { nextItemDescription: nextItem.description }),
+                  }),
+            }),
         dashboardUrl: new URL(
           `/plans/${encodeURIComponent(snapshot.value.planId)}`,
           origin,

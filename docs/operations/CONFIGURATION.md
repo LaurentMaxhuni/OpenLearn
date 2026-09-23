@@ -33,6 +33,12 @@ The service fails closed when required origins, database, identity, session,
 or production metrics settings are absent. The production database pool uses
 certificate verification (`rejectUnauthorized=true`).
 
+Dashboard sessions created with the identity package defaults include the
+plan, progress, and personalization scopes used by the connected dashboard.
+If an identity gateway mints sessions directly, include `personalization:read`
+and `personalization:write` to enable the consent and feedback controls; the
+application still enforces learner consent and state-version checks.
+
 When the two MCP metadata variables are set, the service publishes
 `/.well-known/oauth-protected-resource` and adds a `WWW-Authenticate` discovery
 challenge to unauthenticated `/mcp` requests. The configured authorization

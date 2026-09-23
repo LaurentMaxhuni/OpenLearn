@@ -1766,3 +1766,52 @@ h3 {
     padding: 18px 0;
   }
 }
+
+.plan-collection-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.35fr) auto;
+  align-items: end;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.plan-collection-controls label {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.plan-collection-controls input,
+.plan-collection-controls select {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.plan-collection-controls p {
+  padding: 0 0 10px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .plan-collection-controls {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .plan-collection-controls p {
+    padding: 0;
+  }
+}

@@ -111,3 +111,48 @@ test('connected dashboard client hydrates plans and carries a CSRF token', async
   assert.equal(new Headers(progressRequest?.init?.headers).get('x-openlearn-csrf'), 'csrf-token');
   assert.equal(new Headers(deleteRequest?.init?.headers).get('x-openlearn-csrf'), 'csrf-token');
 });
+
+test('loads plan summaries without requesting every plan body', async () => {
+  const requests: string[] = [];
+  const client = createDashboardApiClient({
+    fetch: async (input) => {
+      requests.push(String(input));
+      return new Response(JSON.stringify({
+        outcome: 'succeeded',
+        value: [{
+          planId: plan.planId,
+          revisionId: plan.revisionId,
+          revisionNumber: plan.revisionNumber,
+          acceptedAt: plan.acceptedAt,
+          goalTitle: plan.content.goal.title,
+          nextItemId: 'connected-item',
+          nextItemTitle: 'First item',
+          progressSummary: summary,
+          dashboardUrl: plan.dashboardUrl,
+        }],
+      }), { status: 200 });
+    },
+  });
+
+  const summaries = await client.listPlanSummaries();
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0]?.nextItemTitle, 'First item');
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]?.endsWith('/api/plans'), true);
+});
+
+test('gives an actionable message when the dashboard session has expired', async () => {
+  const client = createDashboardApiClient({
+    fetch: async () => new Response(null, { status: 401 }),
+  });
+
+  let failure: unknown;
+  try {
+    await client.listPlanSummaries();
+  } catch (error) {
+    failure = error;
+  }
+  assert.equal(failure instanceof Error, true);
+  assert.equal((failure as Error).message.includes('session has expired'), true);
+  assert.equal((failure as Error).message.includes('Sign in again'), true);
+});

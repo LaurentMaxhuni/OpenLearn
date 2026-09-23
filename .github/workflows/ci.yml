@@ -12,6 +12,22 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      OPENLEARN_TEST_DATABASE_URL: postgres://openlearn:openlearn@localhost:5432/openlearn
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: openlearn
+          POSTGRES_USER: openlearn
+          POSTGRES_PASSWORD: openlearn
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U openlearn -d openlearn"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

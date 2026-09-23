@@ -21,6 +21,7 @@ import type {
   PlanHandoff,
   PlanSummary,
   PlanView,
+  PersonalizationApplication,
 } from '@openlearn/application';
 import { securityHeaders, setRawSecurityHeaders } from './security.js';
 import {
@@ -77,6 +78,7 @@ export interface DashboardApplication {
     input: DeletePlanInput,
     signal?: AbortSignal,
   ): Promise<ApplicationResult<void>>;
+  readonly personalization?: PersonalizationApplication;
 }
 
 export interface DashboardDependencies {
@@ -470,6 +472,96 @@ export const createService = (options: ServiceOptions): OpenLearnService => {
           planId: params.planId ?? '',
         } as unknown as DeletePlanInput);
         return reply.code(responseStatusFor(result)).send(result);
+      } catch {
+        return reply.code(503).send({ error: 'service_unavailable' });
+      }
+    });
+
+    app.get('/api/plans/:planId/personalization', async (request, reply) => {
+      const actor = await dashboardActor(request, reply);
+      if (actor === undefined) return;
+      const personalization = dashboard.application.personalization;
+      if (personalization === undefined) {
+        return reply.code(503).send({ error: 'personalization_unavailable' });
+      }
+      const params = request.params as { readonly planId?: string };
+      try {
+        const result = await personalization.getPersonalization(actor, {
+          planId: params.planId ?? '',
+        });
+        return reply.code(responseStatusFor(result)).send(result);
+      } catch {
+        return reply.code(503).send({ error: 'service_unavailable' });
+      }
+    });
+
+    app.post('/api/plans/:planId/personalization', async (request, reply) => {
+      const actor = await dashboardActor(request, reply);
+      if (actor === undefined) return;
+      const personalization = dashboard.application.personalization;
+      if (personalization === undefined) {
+        return reply.code(503).send({ error: 'personalization_unavailable' });
+      }
+      const params = request.params as { readonly planId?: string };
+      const planId = params.planId ?? '';
+      const body = bodyRecord(request.body);
+      if (body === undefined || typeof body.action !== 'string') {
+        return reply.code(400).send({ error: 'invalid_request' });
+      }
+      try {
+        switch (body.action) {
+          case 'change_consent': {
+            const { consentAction, ...input } = body;
+            const result = await personalization.changePersonalizationConsent(actor, {
+              ...input,
+              action: consentAction,
+              planId,
+            } as unknown as import('@openlearn/application').ChangePersonalizationConsentInput);
+            return reply.code(responseStatusFor(result)).send(result);
+          }
+          case 'record_feedback': {
+            const { action: _action, ...input } = body;
+            const result = await personalization.recordLearnerFeedback(actor, {
+              ...input,
+              planId,
+            } as unknown as import('@openlearn/application').RecordLearnerFeedbackInput);
+            return reply.code(responseStatusFor(result)).send(result);
+          }
+          case 'correct_feedback': {
+            const { action: _action, ...input } = body;
+            const result = await personalization.correctLearnerFeedback(actor, {
+              ...input,
+              planId,
+            } as unknown as import('@openlearn/application').CorrectLearnerFeedbackInput);
+            return reply.code(responseStatusFor(result)).send(result);
+          }
+          case 'delete_feedback': {
+            const { action: _action, ...input } = body;
+            const result = await personalization.deleteLearnerFeedback(actor, {
+              ...input,
+              planId,
+            } as unknown as import('@openlearn/application').DeleteLearnerFeedbackInput);
+            return reply.code(responseStatusFor(result)).send(result);
+          }
+          case 'evaluate': {
+            const { action: _action, ...input } = body;
+            const result = await personalization.evaluatePersonalization(actor, {
+              ...input,
+              planId,
+            } as unknown as import('@openlearn/application').EvaluatePersonalizationInput);
+            return reply.code(responseStatusFor(result)).send(result);
+          }
+          case 'decide_proposal': {
+            const { action: _action, ...input } = body;
+            const result = await personalization.decidePersonalizationProposal(actor, {
+              ...input,
+              planId,
+            } as unknown as import('@openlearn/application').DecidePersonalizationProposalInput);
+            return reply.code(responseStatusFor(result)).send(result);
+          }
+          default:
+            return reply.code(400).send({ error: 'invalid_request' });
+        }
       } catch {
         return reply.code(503).send({ error: 'service_unavailable' });
       }

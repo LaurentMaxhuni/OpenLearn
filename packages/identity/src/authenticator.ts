@@ -281,7 +281,13 @@ export const createSessionToken = async (
   if (!Number.isInteger(expiresInSeconds) || expiresInSeconds < 60 || expiresInSeconds > 24 * 60 * 60) {
     throw new Error('Session lifetime must be between 60 seconds and 24 hours.');
   }
-  const scopes = options.scopes ?? ['plan:read', 'plan:write', 'progress:write'];
+  const scopes = options.scopes ?? [
+    'plan:read',
+    'plan:write',
+    'progress:write',
+    'personalization:read',
+    'personalization:write',
+  ];
   return new SignJWT({ scope: scopes.join(' ') })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuer(issuer)

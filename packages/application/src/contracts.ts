@@ -85,8 +85,11 @@ export interface PlanSummary {
   readonly acceptedAt: string;
   readonly title?: string;
   readonly goalTitle: string;
+  readonly goalDescription?: string;
   readonly progressSummary: ProgressSummary;
   readonly nextItemId?: PlanItemId;
+  readonly nextItemTitle?: string;
+  readonly nextItemDescription?: string;
   readonly dashboardUrl: string;
 }
 

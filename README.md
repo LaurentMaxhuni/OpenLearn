@@ -14,7 +14,8 @@ OpenLearn provides reusable components and a dashboard for plan-shaped content s
 - a structured learning-plan model that can be rendered consistently;
 - an MCP boundary for receiving validated plan-shaped data from AI agents;
 - visual progress, milestones, topics, and next actions;
-- consent-aware personalization feedback and suggestion review;
+- searchable plans with progress filters and summary-first connected loading;
+- consent-aware personalization feedback and suggestion review in preview and connected modes;
 - authenticated connected dashboard reads, progress actions, and plan deletion;
 - provider-neutral OIDC/OAuth verification, PostgreSQL state, operation recovery, and retention maintenance;
 - portable service/dashboard images, Compose topology, CI image gates, and deployment runbooks;

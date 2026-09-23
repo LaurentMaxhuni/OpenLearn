@@ -39,6 +39,8 @@ security/privacy, and community owners before a public learner release.
 
 - [ ] Connected `/plans` and direct plan handoff work for a test identity.
 - [ ] Progress, stale conflict, retry, refresh, and deletion paths are tested.
+- [ ] Personalization consent, feedback correction/deletion, proposal review,
+  and refresh are verified against the connected service.
 - [ ] Keyboard/narrow-layout smoke checks and selected browser performance
   measurements are recorded.
 - [ ] Support, incident, security, privacy, and ownership contacts are named.

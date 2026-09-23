@@ -1123,9 +1123,25 @@ export const RecoveryPanel = ({
 export interface PlanCollectionProps {
   readonly model: PlanListViewModel;
   readonly onNavigate?: (href: string) => void;
+  readonly onRetry?: () => void;
 }
 
-export const PlanCollection = ({ model, onNavigate }: PlanCollectionProps) => {
+export const PlanCollection = ({ model, onNavigate, onRetry }: PlanCollectionProps) => {
+  const [search, setSearch] = useState('');
+  const [progressFilter, setProgressFilter] = useState<'all' | 'not_started' | 'in_progress' | 'completed'>('all');
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const visiblePlans = model.plans.filter((plan) => {
+    const matchesSearch = normalizedSearch.length === 0 || [
+      plan.title,
+      plan.goalSummary,
+      plan.nextAction?.title ?? '',
+    ].some((value) => value.toLocaleLowerCase().includes(normalizedSearch));
+    const matchesProgress = progressFilter === 'all' ||
+      (progressFilter === 'not_started' && plan.progress.completedCount === 0 && plan.progress.inProgressCount === 0) ||
+      (progressFilter === 'in_progress' && plan.progress.inProgressCount > 0) ||
+      (progressFilter === 'completed' && plan.progress.completedCount === plan.progress.totalCount);
+    return matchesSearch && matchesProgress;
+  });
   if (model.pageState === 'loading') {
     return <LoadingState label="Loading your plans..." />;
   }
@@ -1142,12 +1158,37 @@ export const PlanCollection = ({ model, onNavigate }: PlanCollectionProps) => {
       <RecoveryPanel
         title="Your plans are unavailable"
         message={model.pageMessage ?? 'Try again or refresh when you are ready.'}
+        {...(onRetry === undefined ? {} : { actionLabel: 'Try again', onAction: onRetry })}
       />
     );
   }
-  const continuationPlan = model.plans.find((plan) => plan.nextAction !== undefined) ?? model.plans[0];
+  if (visiblePlans.length === 0) {
+    return (
+      <>
+        <PlanCollectionFilters
+          search={search}
+          progressFilter={progressFilter}
+          resultCount={0}
+          onSearch={setSearch}
+          onProgressFilter={setProgressFilter}
+        />
+        <EmptyState
+          title="No matching plans"
+          message="Try another search or clear the progress filter."
+        />
+      </>
+    );
+  }
+  const continuationPlan = visiblePlans.find((plan) => plan.nextAction !== undefined) ?? visiblePlans[0];
   return (
     <>
+      <PlanCollectionFilters
+        search={search}
+        progressFilter={progressFilter}
+        resultCount={visiblePlans.length}
+        onSearch={setSearch}
+        onProgressFilter={setProgressFilter}
+      />
       {continuationPlan === undefined ? null : (
         <section
           className="continue-card"
@@ -1174,7 +1215,7 @@ export const PlanCollection = ({ model, onNavigate }: PlanCollectionProps) => {
         </section>
       )}
       <ol className="plan-list" aria-label="Your learning plans">
-        {model.plans.map((plan) => (
+        {visiblePlans.map((plan) => (
           <PlanSummaryCard
             key={plan.planId}
             plan={plan}
@@ -1185,6 +1226,48 @@ export const PlanCollection = ({ model, onNavigate }: PlanCollectionProps) => {
     </>
   );
 };
+
+const PlanCollectionFilters = ({
+  search,
+  progressFilter,
+  resultCount,
+  onSearch,
+  onProgressFilter,
+}: {
+  readonly search: string;
+  readonly progressFilter: 'all' | 'not_started' | 'in_progress' | 'completed';
+  readonly resultCount: number;
+  readonly onSearch: (value: string) => void;
+  readonly onProgressFilter: (value: 'all' | 'not_started' | 'in_progress' | 'completed') => void;
+}) => (
+  <section className="plan-collection-controls" aria-label="Filter your learning plans">
+    <label>
+      <span>Search plans</span>
+      <input
+        type="search"
+        maxLength={120}
+        value={search}
+        onChange={(event) => onSearch(event.target.value)}
+        placeholder="Plan, goal, or next item"
+      />
+    </label>
+    <label>
+      <span>Progress</span>
+      <select
+        value={progressFilter}
+        onChange={(event) => onProgressFilter(event.target.value as typeof progressFilter)}
+      >
+        <option value="all">All plans</option>
+        <option value="not_started">Not started</option>
+        <option value="in_progress">In progress</option>
+        <option value="completed">Completed</option>
+      </select>
+    </label>
+    <p role="status" aria-live="polite">
+      {resultCount} {resultCount === 1 ? 'plan' : 'plans'} shown
+    </p>
+  </section>
+);
 
 export interface DashboardDetailProps {
   readonly model: PlanDetailViewModel;
