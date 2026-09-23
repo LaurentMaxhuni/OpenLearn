@@ -24,6 +24,7 @@ import {
   type DeletionState,
   type LearnerActionKind,
   type LearnerActionState,
+  type PlanProgressFilter,
   type PlanDataControlsViewModel,
 } from '@openlearn/ui';
 import {
@@ -168,6 +169,10 @@ const PlansPage = ({
   onNavigate,
   onRefresh,
   connected = false,
+  search,
+  progressFilter,
+  onSearchChange,
+  onProgressFilterChange,
   pageState,
   pageMessage,
 }: {
@@ -177,6 +182,10 @@ const PlansPage = ({
   readonly onNavigate: (href: string) => void;
   readonly onRefresh?: () => void;
   readonly connected?: boolean;
+  readonly search: string;
+  readonly progressFilter: PlanProgressFilter;
+  readonly onSearchChange: (value: string) => void;
+  readonly onProgressFilterChange: (value: PlanProgressFilter) => void;
   readonly pageState?: 'loading' | 'ready' | 'error';
   readonly pageMessage?: string;
 }) => {
@@ -219,7 +228,7 @@ const PlansPage = ({
       <PageHeader
         eyebrow="Your workspace"
         title="Learning plans"
-        description="A clear place to return to the learning paths you have accepted."
+        description="Pick up your next step or browse the plans you’ve saved."
       />
       {connected ? (
         <p className="surface-note" role="note">
@@ -232,6 +241,10 @@ const PlansPage = ({
       <PlanCollection
         model={model}
         onNavigate={onNavigate}
+        search={search}
+        progressFilter={progressFilter}
+        onSearchChange={onSearchChange}
+        onProgressFilterChange={onProgressFilterChange}
         {...(onRefresh === undefined ? {} : { onRetry: onRefresh })}
       />
     </>
@@ -351,6 +364,19 @@ const DetailPage = ({
     return <UnavailablePage onNavigate={onNavigate} />;
   }
 
+  const previewConflictStates =
+    preview === 'conflict'
+      ? Object.fromEntries(
+          snapshot.currentProgress
+            .filter((entry) => entry.state === 'in_progress')
+            .map((entry) => [entry.itemId, 'conflict' as const]),
+        )
+      : {};
+  const detailActionStates = { ...actionStates, ...previewConflictStates };
+  const detailProgressMessage =
+    preview === 'conflict'
+      ? 'Progress changed in another session. Refresh before trying again.'
+      : progressMessage;
   const operation =
     preview === 'pending'
       ? { state: 'pending' as const, label: 'A plan update is being prepared.' }
@@ -363,8 +389,8 @@ const DetailPage = ({
     ...(preview === 'partial' || preview === 'invalid' || preview === 'pending' || preview === 'recovering'
       ? { contentState: contentStateFor(preview) }
       : {}),
-    ...(Object.keys(actionStates).length === 0 ? {} : { actionStates }),
-    ...(progressMessage === undefined ? {} : { progressMessage }),
+    ...(Object.keys(detailActionStates).length === 0 ? {} : { actionStates: detailActionStates }),
+    ...(detailProgressMessage === undefined ? {} : { progressMessage: detailProgressMessage }),
     ...(personalization === undefined ? {} : { personalization }),
     ...(personalizationMessage === undefined
       ? {}
@@ -378,7 +404,7 @@ const DetailPage = ({
       <PageHeader
         eyebrow={`Revision ${snapshot.revisionNumber}`}
         title={detail.title}
-        description="Explore the accepted path, choose an item, and keep confirmed progress visible."
+        description="Follow the plan one step at a time and keep your progress up to date."
         backHref="/plans"
         onNavigate={onNavigate}
       />
@@ -441,6 +467,8 @@ const StaticDashboard = () => {
   >(() => hydratePersonalization(new Map(STATIC_PLANS.map((plan) => [plan.planId, plan]))));
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const [preview, setPreview] = useState<StaticPreviewState>('accepted');
+  const [planSearch, setPlanSearch] = useState('');
+  const [planProgressFilter, setPlanProgressFilter] = useState<PlanProgressFilter>('all');
   const [focusedItemId, setFocusedItemId] = useState<string | undefined>();
   const [actionStatesByPlan, setActionStatesByPlan] = useState<ActionStatesByPlan>({});
   const [deletionState, setDeletionState] = useState<DeletionState>('available');
@@ -884,7 +912,15 @@ const StaticDashboard = () => {
         {route.kind === 'unknown' ? (
           <UnavailablePage onNavigate={navigate} />
         ) : route.kind === 'plans' ? (
-          <PlansPage preview={preview} snapshots={snapshots} onNavigate={navigate} />
+          <PlansPage
+            preview={preview}
+            snapshots={snapshots}
+            onNavigate={navigate}
+            search={planSearch}
+            progressFilter={planProgressFilter}
+            onSearchChange={setPlanSearch}
+            onProgressFilterChange={setPlanProgressFilter}
+          />
         ) : selectedPlan === undefined ? (
           <UnavailablePage onNavigate={navigate} />
         ) : (
@@ -967,6 +1003,8 @@ const ConnectedDashboard = () => {
   const [pageState, setPageState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [pageMessage, setPageMessage] = useState<string | undefined>();
   const [pathname, setPathname] = useState(() => window.location.pathname);
+  const [planSearch, setPlanSearch] = useState('');
+  const [planProgressFilter, setPlanProgressFilter] = useState<PlanProgressFilter>('all');
   const [detailLoading, setDetailLoading] = useState(
     () => routeForPath(window.location.pathname).kind === 'plan',
   );
@@ -1407,6 +1445,10 @@ const ConnectedDashboard = () => {
             onNavigate={navigate}
             onRefresh={refresh}
             connected
+            search={planSearch}
+            progressFilter={planProgressFilter}
+            onSearchChange={setPlanSearch}
+            onProgressFilterChange={setPlanProgressFilter}
             pageState={pageState}
             {...(pageMessage === undefined ? {} : { pageMessage })}
           />

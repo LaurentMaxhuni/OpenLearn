@@ -182,6 +182,9 @@ export const TrustStateBanner = ({
   recovery,
 }: TrustStateBannerProps) => {
   const blocking = surfaceState === 'invalid' || surfaceState === 'unavailable';
+  const operationLabel = operation?.label.trim().replace(/[.!?]+$/, '');
+  const trustLabel = trust.label.trim().replace(/[.!?]+$/, '');
+  const operationIsRedundant = operationLabel !== undefined && operationLabel === trustLabel;
   return (
     <section
       className={`trust-banner tone-${trust.tone}`}
@@ -198,7 +201,7 @@ export const TrustStateBanner = ({
           {trust.label}
         </p>
         <p>{trust.detail}</p>
-        {operation === undefined ? null : (
+        {operation === undefined || operationIsRedundant ? null : (
           <p className="operation-note">{operation.label}</p>
         )}
         {recovery === undefined ? null : <p className="operation-note">{recovery.detail}</p>}
@@ -328,7 +331,7 @@ export const NextActionCard = ({
           disabled={disabled}
           onClick={() => onSelect(nextAction.itemId)}
         >
-          Open next item <span aria-hidden="true">→</span>
+          Jump to next step
         </button>
       )}
     </section>
@@ -532,11 +535,13 @@ export const ResourceList = ({ resources }: ResourceListProps) => {
 export interface LearnerProgressActionProps {
   readonly action: LearnerActionViewModel;
   readonly onAction?: () => void;
+  readonly disabled?: boolean;
 }
 
 export const LearnerProgressAction = ({
   action,
   onAction,
+  disabled = false,
 }: LearnerProgressActionProps) => {
   const statusId = useScopedId('learner-action-status');
   return (
@@ -544,7 +549,7 @@ export const LearnerProgressAction = ({
       <button
         className={action.kind === 'undo_completion' ? 'button button-secondary' : 'button button-primary'}
         type="button"
-        disabled={!action.enabled || onAction === undefined}
+        disabled={!action.enabled || disabled || onAction === undefined}
         aria-describedby={statusId}
         onClick={() => onAction?.()}
       >
@@ -563,10 +568,17 @@ export const LearnerProgressAction = ({
 
 export interface PlanItemDetailProps {
   readonly item?: PlanItemViewModel;
+  readonly isNextAction?: boolean;
+  readonly disabled?: boolean;
   readonly onProgressAction?: (itemId: string, action: LearnerActionKind) => void;
 }
 
-export const PlanItemDetail = ({ item, onProgressAction }: PlanItemDetailProps) => {
+export const PlanItemDetail = ({
+  item,
+  isNextAction = false,
+  disabled = false,
+  onProgressAction,
+}: PlanItemDetailProps) => {
   const headingId = useScopedId('focused-item-heading');
   return (
     <section
@@ -577,7 +589,7 @@ export const PlanItemDetail = ({ item, onProgressAction }: PlanItemDetailProps) 
       tabIndex={-1}
     >
       <div className="section-heading">
-        <p className="eyebrow">Focused item</p>
+        <p className="eyebrow">{isNextAction ? 'Next step' : 'Selected item'}</p>
         <h2 id={headingId}>{item === undefined ? 'No item selected' : item.title}</h2>
       </div>
       {item === undefined ? (
@@ -597,6 +609,7 @@ export const PlanItemDetail = ({ item, onProgressAction }: PlanItemDetailProps) 
           )}
           <LearnerProgressAction
             action={item.action}
+            disabled={disabled}
             {...(onProgressAction === undefined
               ? {}
               : { onAction: () => onProgressAction(item.itemId, item.action.kind) })}
@@ -854,8 +867,10 @@ export const PersonalizationPanel = ({
             {model.proposals.map((proposal) => (
               <li key={proposal.proposalId}>
                 <div>
-                  <strong>{proposalKindLabel(proposal)}</strong>
-                  <span className="proposal-status">Status: {proposal.statusLabel}</span>
+                  <div className="proposal-heading">
+                    <strong>{proposalKindLabel(proposal)}</strong>
+                    <span className="proposal-status">Status: {proposal.statusLabel}</span>
+                  </div>
                   <p>{proposal.explanation}</p>
                   <p className="muted">Why this suggestion: {proposal.basis.join(', ')}.</p>
                   {proposal.handoffLabel === undefined ? null : (
@@ -1033,6 +1048,13 @@ export interface PlanSummaryCardProps {
   readonly onNavigate?: (href: string) => void;
 }
 
+const planProgressLabel = (plan: PlanSummaryViewModel): string => {
+  if (plan.progress.totalCount === 0) return 'No steps yet';
+  if (plan.progress.completedCount === plan.progress.totalCount) return 'Complete';
+  if (plan.progress.completedCount > 0 || plan.progress.inProgressCount > 0) return 'In progress';
+  return 'Not started';
+};
+
 export const PlanSummaryCard = ({ plan, onNavigate }: PlanSummaryCardProps) => (
   <li className="plan-card-item">
     <article className="plan-card">
@@ -1041,22 +1063,38 @@ export const PlanSummaryCard = ({ plan, onNavigate }: PlanSummaryCardProps) => (
         href={plan.href}
         onClick={(event) => navigationClick(event, plan.href, onNavigate)}
       >
-        <div className="plan-card-topline">
-          <span className="state-pill">{stateLabel(plan.contentState)}</span>
-          <span className="plan-arrow" aria-hidden="true">
-            →
+        <div className="plan-card-copy">
+          <div className="plan-card-topline">
+            <span className="state-pill">{planProgressLabel(plan)}</span>
+            {plan.contentState === 'accepted' ? null : (
+              <span className="state-pill content-state-pill">{stateLabel(plan.contentState)}</span>
+            )}
+          </div>
+          <h2>{plan.title}</h2>
+          <p>{plan.goalSummary}</p>
+        </div>
+        <div className="plan-card-progress">
+          <div className="plan-progress-heading">
+            <span>Progress</span>
+            <span>
+              {plan.progress.completedCount} of {plan.progress.totalCount} steps complete
+            </span>
+          </div>
+          <span className="plan-progress-track" aria-hidden="true">
+            <span
+              style={{
+                width: `${plan.progress.totalCount === 0
+                  ? 0
+                  : Math.round((plan.progress.completedCount / plan.progress.totalCount) * 100)}%`,
+              }}
+            />
           </span>
+          <p className="plan-card-next">
+            <span className="plan-card-next-label">Up next</span>
+            {plan.nextAction?.title ?? 'All steps complete'}
+          </p>
         </div>
-        <h2>{plan.title}</h2>
-        <p>{plan.goalSummary}</p>
-        <div className="plan-card-footer">
-          <span>{plan.progress.label}</span>
-          {plan.nextAction === undefined ? (
-            <span>All current items complete</span>
-          ) : (
-            <span>Next: {plan.nextAction.title}</span>
-          )}
-        </div>
+        <span className="plan-card-action">View plan</span>
       </a>
     </article>
   </li>
@@ -1082,8 +1120,10 @@ export const EmptyState = ({ title, message }: EmptyStateProps) => {
       <span className="empty-icon" aria-hidden="true">
         ◌
       </span>
-      <h2 id={headingId}>{title}</h2>
-      <p>{message}</p>
+      <div className="state-message">
+        <h2 id={headingId}>{title}</h2>
+        <p>{message}</p>
+      </div>
     </section>
   );
 };
@@ -1124,22 +1164,56 @@ export interface PlanCollectionProps {
   readonly model: PlanListViewModel;
   readonly onNavigate?: (href: string) => void;
   readonly onRetry?: () => void;
+  readonly search?: string;
+  readonly progressFilter?: PlanProgressFilter;
+  readonly onSearchChange?: (value: string) => void;
+  readonly onProgressFilterChange?: (value: PlanProgressFilter) => void;
 }
 
-export const PlanCollection = ({ model, onNavigate, onRetry }: PlanCollectionProps) => {
-  const [search, setSearch] = useState('');
-  const [progressFilter, setProgressFilter] = useState<'all' | 'not_started' | 'in_progress' | 'completed'>('all');
-  const normalizedSearch = search.trim().toLocaleLowerCase();
+export type PlanProgressFilter = 'all' | 'not_started' | 'in_progress' | 'completed';
+
+export const PlanCollection = ({
+  model,
+  onNavigate,
+  onRetry,
+  search,
+  progressFilter,
+  onSearchChange,
+  onProgressFilterChange,
+}: PlanCollectionProps) => {
+  const [localSearch, setLocalSearch] = useState('');
+  const [localProgressFilter, setLocalProgressFilter] = useState<PlanProgressFilter>('all');
+  const searchValue = search ?? localSearch;
+  const activeProgressFilter = progressFilter ?? localProgressFilter;
+  const updateSearch = (value: string) => {
+    setLocalSearch(value);
+    onSearchChange?.(value);
+  };
+  const updateProgressFilter = (value: PlanProgressFilter) => {
+    setLocalProgressFilter(value);
+    onProgressFilterChange?.(value);
+  };
+  const clearFilters = () => {
+    updateSearch('');
+    updateProgressFilter('all');
+  };
+  const filtersActive = searchValue.trim().length > 0 || activeProgressFilter !== 'all';
+  const normalizedSearch = searchValue.trim().toLocaleLowerCase();
   const visiblePlans = model.plans.filter((plan) => {
     const matchesSearch = normalizedSearch.length === 0 || [
       plan.title,
       plan.goalSummary,
       plan.nextAction?.title ?? '',
     ].some((value) => value.toLocaleLowerCase().includes(normalizedSearch));
-    const matchesProgress = progressFilter === 'all' ||
-      (progressFilter === 'not_started' && plan.progress.completedCount === 0 && plan.progress.inProgressCount === 0) ||
-      (progressFilter === 'in_progress' && plan.progress.inProgressCount > 0) ||
-      (progressFilter === 'completed' && plan.progress.completedCount === plan.progress.totalCount);
+    const matchesProgress = activeProgressFilter === 'all' ||
+      (activeProgressFilter === 'not_started' && plan.progress.completedCount === 0 && plan.progress.inProgressCount === 0) ||
+      (activeProgressFilter === 'in_progress' && (
+        plan.progress.inProgressCount > 0 ||
+        (plan.progress.completedCount > 0 && plan.progress.completedCount < plan.progress.totalCount)
+      )) ||
+      (activeProgressFilter === 'completed' &&
+        plan.progress.totalCount > 0 &&
+        plan.progress.completedCount === plan.progress.totalCount);
     return matchesSearch && matchesProgress;
   });
   if (model.pageState === 'loading') {
@@ -1147,10 +1221,23 @@ export const PlanCollection = ({ model, onNavigate, onRetry }: PlanCollectionPro
   }
   if (model.pageState === 'empty') {
     return (
-      <EmptyState
-        title="No plans yet"
-        message={model.pageMessage ?? 'A connected AI client can supply your first learning plan.'}
-      />
+      <>
+        {filtersActive ? (
+          <PlanCollectionFilters
+            search={searchValue}
+            progressFilter={activeProgressFilter}
+            resultCount={0}
+            showClear
+            onSearch={updateSearch}
+            onProgressFilter={updateProgressFilter}
+            onClear={clearFilters}
+          />
+        ) : null}
+        <EmptyState
+          title="No plans yet"
+          message={model.pageMessage ?? 'A connected AI client can supply your first learning plan.'}
+        />
+      </>
     );
   }
   if (model.pageState === 'error') {
@@ -1166,15 +1253,17 @@ export const PlanCollection = ({ model, onNavigate, onRetry }: PlanCollectionPro
     return (
       <>
         <PlanCollectionFilters
-          search={search}
-          progressFilter={progressFilter}
+          search={searchValue}
+          progressFilter={activeProgressFilter}
           resultCount={0}
-          onSearch={setSearch}
-          onProgressFilter={setProgressFilter}
+          showClear={filtersActive}
+          onSearch={updateSearch}
+          onProgressFilter={updateProgressFilter}
+          onClear={clearFilters}
         />
         <EmptyState
           title="No matching plans"
-          message="Try another search or clear the progress filter."
+          message="Adjust your search or progress filter."
         />
       </>
     );
@@ -1183,11 +1272,13 @@ export const PlanCollection = ({ model, onNavigate, onRetry }: PlanCollectionPro
   return (
     <>
       <PlanCollectionFilters
-        search={search}
-        progressFilter={progressFilter}
+        search={searchValue}
+        progressFilter={activeProgressFilter}
         resultCount={visiblePlans.length}
-        onSearch={setSearch}
-        onProgressFilter={setProgressFilter}
+        showClear={filtersActive}
+        onSearch={updateSearch}
+        onProgressFilter={updateProgressFilter}
+        onClear={clearFilters}
       />
       {continuationPlan === undefined ? null : (
         <section
@@ -1210,19 +1301,27 @@ export const PlanCollection = ({ model, onNavigate, onRetry }: PlanCollectionPro
             href={continuationPlan.href}
             onClick={(event) => navigationClick(event, continuationPlan.href, onNavigate)}
           >
-            Open plan <span aria-hidden="true">→</span>
+            Open plan
           </a>
         </section>
       )}
-      <ol className="plan-list" aria-label="Your learning plans">
-        {visiblePlans.map((plan) => (
-          <PlanSummaryCard
-            key={plan.planId}
-            plan={plan}
-            {...(onNavigate === undefined ? {} : { onNavigate })}
-          />
-        ))}
-      </ol>
+      <section className="plan-library" aria-labelledby="plan-library-heading">
+        <header className="plan-list-heading">
+          <div>
+            <p className="eyebrow">Your collection</p>
+            <h2 id="plan-library-heading">All plans</h2>
+          </div>
+        </header>
+        <ol className="plan-list" aria-label="Your learning plans">
+          {visiblePlans.map((plan) => (
+            <PlanSummaryCard
+              key={plan.planId}
+              plan={plan}
+              {...(onNavigate === undefined ? {} : { onNavigate })}
+            />
+          ))}
+        </ol>
+      </section>
     </>
   );
 };
@@ -1231,24 +1330,28 @@ const PlanCollectionFilters = ({
   search,
   progressFilter,
   resultCount,
+  showClear,
   onSearch,
   onProgressFilter,
+  onClear,
 }: {
   readonly search: string;
-  readonly progressFilter: 'all' | 'not_started' | 'in_progress' | 'completed';
+  readonly progressFilter: PlanProgressFilter;
   readonly resultCount: number;
+  readonly showClear?: boolean;
   readonly onSearch: (value: string) => void;
-  readonly onProgressFilter: (value: 'all' | 'not_started' | 'in_progress' | 'completed') => void;
+  readonly onProgressFilter: (value: PlanProgressFilter) => void;
+  readonly onClear?: () => void;
 }) => (
   <section className="plan-collection-controls" aria-label="Filter your learning plans">
     <label>
-      <span>Search plans</span>
-      <input
-        type="search"
-        maxLength={120}
-        value={search}
-        onChange={(event) => onSearch(event.target.value)}
-        placeholder="Plan, goal, or next item"
+        <span>Search plans</span>
+        <input
+          type="search"
+          maxLength={120}
+          value={search}
+          onChange={(event) => onSearch(event.target.value)}
+          placeholder="Plan name or next step"
       />
     </label>
     <label>
@@ -1263,9 +1366,16 @@ const PlanCollectionFilters = ({
         <option value="completed">Completed</option>
       </select>
     </label>
-    <p role="status" aria-live="polite">
-      {resultCount} {resultCount === 1 ? 'plan' : 'plans'} shown
-    </p>
+    <div className="plan-filter-actions">
+      <p role="status" aria-live="polite">
+        {resultCount} {resultCount === 1 ? 'plan' : 'plans'} shown
+      </p>
+      {showClear && onClear !== undefined ? (
+        <button className="button button-quiet filter-reset" type="button" onClick={onClear}>
+          Clear filters
+        </button>
+      ) : null}
+    </div>
   </section>
 );
 
@@ -1310,65 +1420,74 @@ export const DashboardDetail = ({
   onDeleteFeedback,
   onAcceptProposal,
   onRejectProposal,
-}: DashboardDetailProps) => (
-  <div className="detail-view" data-layout="detail-workbench">
-    <TrustStateBanner
-      surfaceState={model.surfaceState}
-      trust={model.trust}
-      {...(model.operation === undefined ? {} : { operation: model.operation })}
-      {...(model.recovery === undefined ? {} : { recovery: model.recovery })}
-    />
-    <NextActionCard
-      {...(model.nextAction === undefined ? {} : { nextAction: model.nextAction })}
-      {...(onSelectItem === undefined ? {} : { onSelect: onSelectItem })}
-      disabled={model.operation !== undefined}
-    />
-    <div className="dashboard-workspace">
-      <PlanItemDetail
-        {...(model.focusedItem === undefined ? {} : { item: model.focusedItem })}
-        {...(onProgressAction === undefined ? {} : { onProgressAction })}
+}: DashboardDetailProps) => {
+  const focusedItemIsNextAction =
+    model.focusedItem !== undefined && model.focusedItem.itemId === model.nextAction?.itemId;
+
+  return (
+    <div className="detail-view" data-layout="detail-workbench">
+      <TrustStateBanner
+        surfaceState={model.surfaceState}
+        trust={model.trust}
+        {...(model.operation === undefined ? {} : { operation: model.operation })}
+        {...(model.recovery === undefined ? {} : { recovery: model.recovery })}
       />
-      <PlanOutline
-        nodes={model.outline}
-        {...(model.focusedItem === undefined
-          ? {}
-          : { focusedItemId: model.focusedItem.itemId })}
-        {...(onSelectItem === undefined ? {} : { onSelectItem })}
-      />
+      {model.nextAction === undefined || !focusedItemIsNextAction ? (
+        <NextActionCard
+          {...(model.nextAction === undefined ? {} : { nextAction: model.nextAction })}
+          {...(onSelectItem === undefined ? {} : { onSelect: onSelectItem })}
+          disabled={model.operation !== undefined}
+        />
+      ) : null}
+      <div className="dashboard-workspace">
+        <PlanItemDetail
+          {...(model.focusedItem === undefined ? {} : { item: model.focusedItem })}
+          isNextAction={focusedItemIsNextAction}
+          disabled={model.operation !== undefined}
+          {...(onProgressAction === undefined ? {} : { onProgressAction })}
+        />
+        <PlanOutline
+          nodes={model.outline}
+          {...(model.focusedItem === undefined
+            ? {}
+            : { focusedItemId: model.focusedItem.itemId })}
+          {...(onSelectItem === undefined ? {} : { onSelectItem })}
+        />
+      </div>
+      <div className="dashboard-summary">
+        <GoalContext
+          {...(model.goal === undefined ? {} : { goal: model.goal })}
+          {...(model.context === undefined ? {} : { context: model.context })}
+        />
+        <ProgressSummary
+          progress={model.progress}
+          {...(model.progressMessage === undefined
+            ? {}
+            : { actionMessage: model.progressMessage })}
+        />
+      </div>
+      {model.personalization === undefined ? null : (
+        <PersonalizationPanel
+          model={model.personalization}
+          {...(onEnablePersonalization === undefined ? {} : { onEnable: onEnablePersonalization })}
+          {...(onPausePersonalization === undefined ? {} : { onPause: onPausePersonalization })}
+          {...(onResumePersonalization === undefined ? {} : { onResume: onResumePersonalization })}
+          {...(onDisablePersonalization === undefined ? {} : { onDisable: onDisablePersonalization })}
+          {...(onRecordFeedback === undefined ? {} : { onRecordFeedback })}
+          {...(onCorrectFeedback === undefined ? {} : { onCorrectFeedback })}
+          {...(onDeleteFeedback === undefined ? {} : { onDeleteFeedback })}
+          {...(onAcceptProposal === undefined ? {} : { onAcceptProposal })}
+          {...(onRejectProposal === undefined ? {} : { onRejectProposal })}
+        />
+      )}
+      {model.dataControls === undefined ? null : (
+        <PlanDataControls
+          controls={model.dataControls}
+          {...(onConfirmDelete === undefined ? {} : { onConfirmDelete })}
+          {...(onRetryDelete === undefined ? {} : { onRetryDelete })}
+          {...(onRefresh === undefined ? {} : { onRefresh })}
+        />
+      )}
     </div>
-    <div className="dashboard-summary">
-      <GoalContext
-        {...(model.goal === undefined ? {} : { goal: model.goal })}
-        {...(model.context === undefined ? {} : { context: model.context })}
-      />
-      <ProgressSummary
-        progress={model.progress}
-        {...(model.progressMessage === undefined
-          ? {}
-          : { actionMessage: model.progressMessage })}
-      />
-    </div>
-    {model.personalization === undefined ? null : (
-      <PersonalizationPanel
-        model={model.personalization}
-        {...(onEnablePersonalization === undefined ? {} : { onEnable: onEnablePersonalization })}
-        {...(onPausePersonalization === undefined ? {} : { onPause: onPausePersonalization })}
-        {...(onResumePersonalization === undefined ? {} : { onResume: onResumePersonalization })}
-        {...(onDisablePersonalization === undefined ? {} : { onDisable: onDisablePersonalization })}
-        {...(onRecordFeedback === undefined ? {} : { onRecordFeedback })}
-        {...(onCorrectFeedback === undefined ? {} : { onCorrectFeedback })}
-        {...(onDeleteFeedback === undefined ? {} : { onDeleteFeedback })}
-        {...(onAcceptProposal === undefined ? {} : { onAcceptProposal })}
-        {...(onRejectProposal === undefined ? {} : { onRejectProposal })}
-      />
-    )}
-    {model.dataControls === undefined ? null : (
-      <PlanDataControls
-        controls={model.dataControls}
-        {...(onConfirmDelete === undefined ? {} : { onConfirmDelete })}
-        {...(onRetryDelete === undefined ? {} : { onRetryDelete })}
-        {...(onRefresh === undefined ? {} : { onRefresh })}
-      />
-    )}
-  </div>
-);
+  );
+};

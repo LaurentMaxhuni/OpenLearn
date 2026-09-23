@@ -57,6 +57,7 @@ export type {
   NextActionCardProps,
   PageHeaderProps,
   PlanCollectionProps,
+  PlanProgressFilter,
   PlanDataControlsProps,
   PlanItemDetailProps,
   PlanOutlineProps,
